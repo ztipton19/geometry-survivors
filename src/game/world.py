@@ -8,7 +8,7 @@ import sys
 
 import pygame
 
-from game import assets
+from game import assets, settings
 from game.entities.bullet import Bullet
 from game.entities.enemy import Enemy
 from game.entities.particle import Particle
@@ -23,7 +23,8 @@ from game.settings import (
     BULLET_RADIUS,
     EMP_PULSE_LIFETIME,
     FPS,
-    HEIGHT,
+    LASER_LIFETIME,
+    LASER_WIDTH,
     NEON_BLUE,
     NEON_CYAN,
     NEON_GREEN,
@@ -32,23 +33,35 @@ from game.settings import (
     NEON_YELLOW,
     PLAYER_RADIUS,
     RED,
-    WIDTH,
-    LASER_LIFETIME,
-    LASER_WIDTH,
 )
 from game.systems import collisions, combat, progression, spawner, upgrades, xp
-from game.ui import draw_end_screen, draw_hud, draw_level_up_screen
+from game.ui import (
+    draw_end_screen,
+    draw_hud,
+    draw_intro_screen,
+    draw_level_up_screen,
+    draw_options_menu,
+    draw_pause_menu,
+    draw_start_menu,
+)
 
 
 class Game:
     def __init__(self) -> None:
         pygame.init()
         pygame.display.set_caption("Neon Survivors (prototype)")
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
+        self.fullscreen = False
+        self.available_resolutions = [
+            ("Default (1100x700)", (settings.WIDTH, settings.HEIGHT)),
+            ("720p (1280x720)", (1280, 720)),
+            ("1080p (1920x1080)", (1920, 1080)),
+        ]
+        self.resolution_index = 0
+        self.screen = pygame.display.set_mode((settings.WIDTH, settings.HEIGHT))
         self.clock = pygame.time.Clock()
         self.font, self.big_font = assets.load_fonts()
 
-        self.player = Player(WIDTH / 2, HEIGHT / 2)
+        self.player = Player(settings.WIDTH / 2, settings.HEIGHT / 2)
         self.enemies: list[Enemy] = []
         self.bullets: list[Bullet] = []
         self.rockets: list[Rocket] = []
@@ -68,13 +81,16 @@ class Game:
         self.elapsed, self.remaining = progression.reset_timer()
 
         self.running = True
-        self.state = "PLAY"
+        self.state = "MENU"
+        self.menu_selection = 0
+        self.options_selection = 0
+        self.pause_selection = 0
         
         # Upgrade system
         self.upgrade_options: list[str] = []
 
     def restart(self) -> None:
-        self.player = Player(WIDTH / 2, HEIGHT / 2)
+        self.player = Player(settings.WIDTH / 2, settings.HEIGHT / 2)
         self.enemies.clear()
         self.bullets.clear()
         self.rockets.clear()
@@ -182,12 +198,16 @@ class Game:
         self.bullets = [
             bullet
             for bullet in self.bullets
-            if bullet.ttl > 0 and -80 < bullet.x < WIDTH + 80 and -80 < bullet.y < HEIGHT + 80
+            if bullet.ttl > 0
+            and -80 < bullet.x < settings.WIDTH + 80
+            and -80 < bullet.y < settings.HEIGHT + 80
         ]
         self.rockets = [
             rocket
             for rocket in self.rockets
-            if rocket.ttl > 0 and -120 < rocket.x < WIDTH + 120 and -120 < rocket.y < HEIGHT + 120
+            if rocket.ttl > 0
+            and -120 < rocket.x < settings.WIDTH + 120
+            and -120 < rocket.y < settings.HEIGHT + 120
         ]
         self.lasers = [laser for laser in self.lasers if laser.ttl > 0]
 
@@ -260,9 +280,33 @@ class Game:
             self.shake_timer = max(0.0, self.shake_timer - dt)
 
     def draw(self) -> None:
-        shake_x, shake_y = self._get_shake_offset()
+        if self.state in ("PLAY", "LEVEL_UP", "PAUSE", "WIN", "LOSE"):
+            shake_x, shake_y = self._get_shake_offset()
+        else:
+            shake_x, shake_y = (0.0, 0.0)
         self.screen.fill(BG)
         self._draw_background(shake_x, shake_y)
+
+        if self.state == "MENU":
+            draw_start_menu(self.screen, self.font, self.big_font, self.menu_selection)
+            pygame.display.flip()
+            return
+        if self.state == "OPTIONS":
+            resolution_label = self.available_resolutions[self.resolution_index][0]
+            draw_options_menu(
+                self.screen,
+                self.font,
+                self.big_font,
+                self.options_selection,
+                resolution_label,
+                self.fullscreen,
+            )
+            pygame.display.flip()
+            return
+        if self.state == "INTRO":
+            draw_intro_screen(self.screen, self.font, self.big_font)
+            pygame.display.flip()
+            return
 
         # Draw XP gems
         for gem in self.xpgems:
@@ -324,7 +368,8 @@ class Game:
 
         for pulse in self.emp_pulses:
             alpha = int(200 * (pulse.ttl / EMP_PULSE_LIFETIME))
-            pulse_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            width, height = self.screen.get_size()
+            pulse_surface = pygame.Surface((width, height), pygame.SRCALPHA)
             pygame.draw.circle(
                 pulse_surface,
                 (*NEON_MAGENTA, alpha),
@@ -373,6 +418,9 @@ class Game:
                 self.upgrade_options,
                 self.player,
             )
+
+        if self.state == "PAUSE":
+            draw_pause_menu(self.screen, self.font, self.big_font, self.pause_selection)
         
         draw_end_screen(self.screen, self.font, self.big_font, self.state, self.player)
 
@@ -386,10 +434,73 @@ class Game:
                 if event.type == pygame.QUIT:
                     self.running = False
                 elif event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
-                        self.running = False
-                    if event.key == pygame.K_r and self.state in ("WIN", "LOSE"):
-                        self.restart()
+                    if self.state == "MENU":
+                        if event.key in (pygame.K_UP, pygame.K_w):
+                            self.menu_selection = (self.menu_selection - 1) % 3
+                        elif event.key in (pygame.K_DOWN, pygame.K_s):
+                            self.menu_selection = (self.menu_selection + 1) % 3
+                        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                            if self.menu_selection == 0:
+                                self.restart()
+                                self.state = "INTRO"
+                            elif self.menu_selection == 1:
+                                self.state = "OPTIONS"
+                            elif self.menu_selection == 2:
+                                self.running = False
+                        elif event.key == pygame.K_ESCAPE:
+                            self.running = False
+                    elif self.state == "OPTIONS":
+                        if event.key in (pygame.K_UP, pygame.K_w):
+                            self.options_selection = (self.options_selection - 1) % 3
+                        elif event.key in (pygame.K_DOWN, pygame.K_s):
+                            self.options_selection = (self.options_selection + 1) % 3
+                        elif event.key in (pygame.K_LEFT, pygame.K_a):
+                            if self.options_selection == 0:
+                                self.resolution_index = (self.resolution_index - 1) % len(
+                                    self.available_resolutions
+                                )
+                                self._apply_display_mode()
+                            elif self.options_selection == 1:
+                                self.fullscreen = not self.fullscreen
+                                self._apply_display_mode()
+                        elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                            if self.options_selection == 0:
+                                self.resolution_index = (self.resolution_index + 1) % len(
+                                    self.available_resolutions
+                                )
+                                self._apply_display_mode()
+                            elif self.options_selection == 1:
+                                self.fullscreen = not self.fullscreen
+                                self._apply_display_mode()
+                        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                            if self.options_selection == 2:
+                                self.state = "MENU"
+                        elif event.key == pygame.K_ESCAPE:
+                            self.state = "MENU"
+                    elif self.state == "INTRO":
+                        self.state = "PLAY"
+                    elif self.state == "PLAY":
+                        if event.key == pygame.K_ESCAPE:
+                            self.state = "PAUSE"
+                    elif self.state == "PAUSE":
+                        if event.key == pygame.K_ESCAPE:
+                            self.state = "PLAY"
+                        elif event.key in (pygame.K_UP, pygame.K_w):
+                            self.pause_selection = (self.pause_selection - 1) % 3
+                        elif event.key in (pygame.K_DOWN, pygame.K_s):
+                            self.pause_selection = (self.pause_selection + 1) % 3
+                        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                            if self.pause_selection == 0:
+                                self.state = "PLAY"
+                            elif self.pause_selection == 1:
+                                self.restart()
+                            elif self.pause_selection == 2:
+                                self.state = "MENU"
+                    elif self.state in ("WIN", "LOSE"):
+                        if event.key == pygame.K_r:
+                            self.restart()
+                        elif event.key == pygame.K_ESCAPE:
+                            self.running = False
                     # Level-up selection
                     if self.state == "LEVEL_UP":
                         if event.key == pygame.K_1 and len(self.upgrade_options) >= 1:
@@ -407,6 +518,16 @@ class Game:
 
         pygame.quit()
         sys.exit()
+
+    def _apply_display_mode(self) -> None:
+        _, (width, height) = self.available_resolutions[self.resolution_index]
+        settings.WIDTH = width
+        settings.HEIGHT = height
+        flags = pygame.FULLSCREEN if self.fullscreen else 0
+        self.screen = pygame.display.set_mode((width, height), flags)
+        self.font, self.big_font = assets.load_fonts()
+        self.player.x = min(max(self.player.x, PLAYER_RADIUS), settings.WIDTH - PLAYER_RADIUS)
+        self.player.y = min(max(self.player.y, PLAYER_RADIUS), settings.HEIGHT - PLAYER_RADIUS)
 
     def _get_shake_offset(self) -> tuple[float, float]:
         if self.shake_timer <= 0:
@@ -500,22 +621,22 @@ class Game:
         offset_y = (self.player.y * 0.3 + self.elapsed * 18) % spacing
         grid_color = (12, 12, 24)
 
-        for x in range(-spacing, WIDTH + spacing, spacing):
+        for x in range(-spacing, settings.WIDTH + spacing, spacing):
             xpos = x - offset_x + shake_x
             pygame.draw.line(
                 self.screen,
                 grid_color,
                 (int(xpos), int(0 + shake_y)),
-                (int(xpos), int(HEIGHT + shake_y)),
+                (int(xpos), int(settings.HEIGHT + shake_y)),
                 1,
             )
-        for y in range(-spacing, HEIGHT + spacing, spacing):
+        for y in range(-spacing, settings.HEIGHT + spacing, spacing):
             ypos = y - offset_y + shake_y
             pygame.draw.line(
                 self.screen,
                 grid_color,
                 (int(0 + shake_x), int(ypos)),
-                (int(WIDTH + shake_x), int(ypos)),
+                (int(settings.WIDTH + shake_x), int(ypos)),
                 1,
             )
 

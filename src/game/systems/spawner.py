@@ -5,13 +5,12 @@ from __future__ import annotations
 import math
 import random
 
+from game import settings
 from game.entities.enemy import Enemy
 from game.settings import (
     ENEMY_BASE_SPEED,
     ENEMY_SPAWN_INTERVAL_MIN,
     ENEMY_SPAWN_INTERVAL_START,
-    HEIGHT,
-    WIDTH,
 )
 
 
@@ -65,7 +64,7 @@ class Spawner:
 
     def _spawn_enemy(self, elapsed: float, player_pos: tuple[float, float]) -> Enemy:
         px, py = player_pos
-        view_radius = max(WIDTH, HEIGHT) * 0.65
+        view_radius = max(settings.WIDTH, settings.HEIGHT) * 0.65
         margin = 140
         distance = view_radius + margin
         angle = random.uniform(0, math.tau)
