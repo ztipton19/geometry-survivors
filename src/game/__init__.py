@@ -1,0 +1,1 @@
+"""Geometry Survivors game package."""
