@@ -426,7 +426,9 @@ class Game:
         
         # Draw shield if active
         if self.player.shield_level >= 0 and self.player.shield_hp > 0:
-            shield_radius = PLAYER_RADIUS + 6
+            # Keep shield clearly outside the player triangle.
+            ship_outer_radius = PLAYER_RADIUS + 4
+            shield_radius = int(ship_outer_radius + 8)
             shield_ratio = 0.0
             if self.player.shield_max > 0:
                 shield_ratio = max(0.0, min(1.0, self.player.shield_hp / self.player.shield_max))
@@ -440,7 +442,7 @@ class Game:
                 shield_color,
                 (screen_px, screen_py),
                 shield_radius,
-                2,
+                3,
             )
 
         self._draw_particles(cam_x, cam_y, shake_x, shake_y)
