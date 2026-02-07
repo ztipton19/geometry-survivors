@@ -10,22 +10,23 @@ from game import assets
 from game.entities.bullet import Bullet
 from game.entities.enemy import Enemy
 from game.entities.player import Player
+from game.entities.xpgem import XPGem
 from game.input import handle_player_input
 from game.settings import (
     BG,
     BULLET_RADIUS,
     ENEMY_RADIUS,
-    FIRE_COOLDOWN_START,
     FPS,
     HEIGHT,
     NEON_CYAN,
+    NEON_GREEN,
     NEON_MAGENTA,
     NEON_YELLOW,
     PLAYER_RADIUS,
     WIDTH,
 )
-from game.systems import collisions, combat, progression, spawner
-from game.ui import draw_end_screen, draw_hud
+from game.systems import collisions, combat, progression, spawner, upgrades, xp
+from game.ui import draw_end_screen, draw_hud, draw_level_up_screen
 
 
 class Game:
@@ -39,8 +40,8 @@ class Game:
         self.player = Player(WIDTH / 2, HEIGHT / 2)
         self.enemies: list[Enemy] = []
         self.bullets: list[Bullet] = []
+        self.xpgems: list[XPGem] = []
 
-        self.fire_cd = FIRE_COOLDOWN_START
         self.fire_timer = 0.0
 
         self.spawner = spawner.Spawner()
@@ -48,16 +49,20 @@ class Game:
 
         self.running = True
         self.state = "PLAY"
+        
+        # Upgrade system
+        self.upgrade_options: list[str] = []
 
     def restart(self) -> None:
         self.player = Player(WIDTH / 2, HEIGHT / 2)
         self.enemies.clear()
         self.bullets.clear()
-        self.fire_cd = FIRE_COOLDOWN_START
+        self.xpgems.clear()
         self.fire_timer = 0.0
         self.spawner.reset()
         self.elapsed, self.remaining = progression.reset_timer()
         self.state = "PLAY"
+        self.upgrade_options.clear()
 
     def update(self, dt: float) -> None:
         if self.state != "PLAY":
@@ -74,9 +79,11 @@ class Game:
 
         self.spawner.update(dt, self.elapsed, self.enemies)
 
+        # Use player's fire cooldown
+        fire_cd = self.player.get_fire_cooldown()
         self.fire_timer += dt
-        while self.fire_timer >= self.fire_cd:
-            self.fire_timer -= self.fire_cd
+        while self.fire_timer >= fire_cd:
+            self.fire_timer -= fire_cd
             combat.fire_minigun(self.player, self.enemies, self.bullets)
 
         combat.update_bullets(self.bullets, dt)
@@ -87,16 +94,36 @@ class Game:
         ]
 
         collisions.update_enemy_positions(self.enemies, self.player, dt)
-        collisions.resolve_bullet_hits(self.bullets, self.enemies)
+        collisions.resolve_bullet_hits(self.bullets, self.enemies, self.player, self.xpgems)
         self.enemies = [enemy for enemy in self.enemies if enemy.hp > 0]
         collisions.resolve_player_hits(self.player, self.enemies, dt)
 
+        # Update XP gems
+        leveled_up = xp.update_xp_gems(self.xpgems, self.player, dt)
+        
+        # Level up
+        if leveled_up:
+            self.state = "LEVEL_UP"
+            self.upgrade_options = upgrades.generate_upgrade_options(self.player)
+
+        # Check death
         if self.player.hp <= 0:
             self.player.hp = 0
             self.state = "LOSE"
 
     def draw(self) -> None:
         self.screen.fill(BG)
+
+        # Draw XP gems
+        for gem in self.xpgems:
+            # Pulse effect
+            pulse = int(5 * (1 + 0.3 * (gem.x % 100) / 100))
+            pygame.draw.circle(
+                self.screen, NEON_GREEN, (int(gem.x), int(gem.y)), pulse, 0
+            )
+            pygame.draw.circle(
+                self.screen, NEON_CYAN, (int(gem.x), int(gem.y)), pulse + 2, 1
+            )
 
         for bullet in self.bullets:
             pygame.draw.circle(
@@ -114,16 +141,33 @@ class Game:
         px, py = int(self.player.x), int(self.player.y)
         pygame.draw.circle(self.screen, NEON_CYAN, (px, py), PLAYER_RADIUS, 2)
         pygame.draw.circle(self.screen, (0, 40, 40), (px, py), PLAYER_RADIUS - 3, 0)
+        
+        # Draw shield if active
+        if self.player.shield_level > 0 and self.player.shield_hp > 0:
+            shield_radius = PLAYER_RADIUS + 5
+            pygame.draw.circle(
+                self.screen, (100, 100, 255), (px, py), shield_radius, 2
+            )
 
         draw_hud(
             self.screen,
             self.font,
             self.player,
-            self.fire_cd,
+            self.player.get_fire_cooldown(),
             len(self.enemies),
             self.remaining,
         )
-        draw_end_screen(self.screen, self.font, self.big_font, self.state)
+        
+        # Draw level-up screen if in that state
+        if self.state == "LEVEL_UP":
+            draw_level_up_screen(
+                self.screen,
+                self.font,
+                self.big_font,
+                self.upgrade_options,
+            )
+        
+        draw_end_screen(self.screen, self.font, self.big_font, self.state, self.player)
 
         pygame.display.flip()
 
@@ -139,6 +183,17 @@ class Game:
                         self.running = False
                     if event.key == pygame.K_r and self.state in ("WIN", "LOSE"):
                         self.restart()
+                    # Level-up selection
+                    if self.state == "LEVEL_UP":
+                        if event.key == pygame.K_1 and len(self.upgrade_options) >= 1:
+                            upgrades.apply_upgrade(self.player, self.upgrade_options[0])
+                            self.state = "PLAY"
+                        elif event.key == pygame.K_2 and len(self.upgrade_options) >= 2:
+                            upgrades.apply_upgrade(self.player, self.upgrade_options[1])
+                            self.state = "PLAY"
+                        elif event.key == pygame.K_3 and len(self.upgrade_options) >= 3:
+                            upgrades.apply_upgrade(self.player, self.upgrade_options[2])
+                            self.state = "PLAY"
 
             self.update(dt)
             self.draw()

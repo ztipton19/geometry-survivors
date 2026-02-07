@@ -41,7 +41,8 @@ def fire_minigun(player: Player, enemies: list[Enemy], bullets: list[Bullet]) ->
     vx = math.cos(ang) * BULLET_SPEED
     vy = math.sin(ang) * BULLET_SPEED
 
-    bullets.append(Bullet(px, py, vx, vy, BULLET_LIFETIME))
+    # Use player's bullet damage
+    bullets.append(Bullet(px, py, vx, vy, BULLET_LIFETIME, damage=player.get_bullet_damage()))
 
 
 def update_bullets(bullets: list[Bullet], dt: float) -> list[Bullet]:

@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -8,6 +8,7 @@ class Bullet:
     vx: float
     vy: float
     ttl: float
+    damage: float = 12.0
 
     @property
     def pos(self) -> tuple[float, float]:

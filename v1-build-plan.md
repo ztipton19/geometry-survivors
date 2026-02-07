@@ -59,7 +59,7 @@ A Geometry Wars + Vampire Survivors hybrid where you pilot a drone into an enemy
 ---
 
 ## PHASE 4: Weapon Systems
-**Goal:** Implement all 6 upgrade paths
+**Goal:** Implement all 7 upgrade paths
 
 ### Minigun (refine existing)
 - [ ] Slow down base fire rate (0.4s start?)
@@ -96,7 +96,15 @@ A Geometry Wars + Vampire Survivors hybrid where you pilot a drone into an enemy
 - [ ] Levels: max shield, regen rate, regen delay
 - [ ] Visual indicator (blue ring around player when active?)
 
-**Deliverable:** All 6 upgrade paths functional with 5 levels each.
+### Tractor Beam (Utility)
+- [ ] Starts at level 0: 0 pickup radius (must collide with XP gems)
+- [ ] Level 1+: Magnetic pull on XP gems within radius
+- [ ] Each level increases pickup radius progressively
+- [ ] Levels: pickup radius expansion (e.g., 0 → 50 → 100 → 150 → 200 → 250 pixels)
+- [ ] Visual indicator: subtle circular pulse when active (level 1+)
+- [ ] Quality of life upgrade that becomes more valuable in chaotic late game
+
+**Deliverable:** All 7 upgrade paths functional with 5 levels each.
 
 ---
 
