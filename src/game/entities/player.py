@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from game.settings import PLAYER_MAX_HP
+from game.settings import PLAYER_MAX_HP, XP_BASE, XP_GROWTH, XP_LINEAR_BONUS
 from game.upgrades import UPGRADES
 
 
@@ -11,7 +11,7 @@ class Player:
     hp: float = PLAYER_MAX_HP
     xp: int = 0
     level: int = 1
-    xp_to_next: int = 100
+    xp_to_next: int = XP_BASE
     # Upgrade tracking
     minigun_level: int = 0
     rockets_level: int = -1  # -1 = not unlocked
@@ -25,8 +25,8 @@ class Player:
     tractor_level: int = 0
     # Stats
     max_hp: float = PLAYER_MAX_HP
-    bullet_damage: float = 12.0
-    fire_cooldown: float = 0.14  # Starting fire rate
+    bullet_damage: float = 10.0
+    fire_cooldown: float = 0.4  # Starting fire rate
     # Game stats
     enemies_killed: int = 0
     damage_dealt: int = 0
@@ -42,7 +42,7 @@ class Player:
         while self.xp >= self.xp_to_next:
             self.xp -= self.xp_to_next
             self.level += 1
-            self.xp_to_next = int(100 * (1.3 ** (self.level - 1)))
+            self.xp_to_next = int(XP_BASE * (XP_GROWTH ** (self.level - 1)) + XP_LINEAR_BONUS * (self.level - 1))
             return True
         return False
 

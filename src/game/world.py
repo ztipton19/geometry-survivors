@@ -651,17 +651,20 @@ class Game:
     def _draw_enemy(self, enemy: Enemy, shake_x: float, shake_y: float) -> None:
         ex = enemy.x + shake_x
         ey = enemy.y + shake_y
+        outline_color = NEON_MAGENTA if enemy.is_boss else RED
+        fill_color = (80, 0, 80) if enemy.is_boss else (60, 0, 0)
+
         if enemy.sides <= 1:
             pygame.draw.circle(
                 self.screen,
-                RED,
+                outline_color,
                 (int(ex), int(ey)),
                 int(enemy.radius),
                 2,
             )
             pygame.draw.circle(
                 self.screen,
-                (60, 0, 0),
+                fill_color,
                 (int(ex), int(ey)),
                 max(1, int(enemy.radius - 3)),
                 0,
@@ -670,8 +673,8 @@ class Game:
 
         points = self._get_polygon_points(ex, ey, enemy.radius, enemy.sides)
         inner_points = self._get_polygon_points(ex, ey, max(1.0, enemy.radius - 3), enemy.sides)
-        pygame.draw.polygon(self.screen, RED, points, 2)
-        pygame.draw.polygon(self.screen, (60, 0, 0), inner_points, 0)
+        pygame.draw.polygon(self.screen, outline_color, points, 2)
+        pygame.draw.polygon(self.screen, fill_color, inner_points, 0)
 
     def _get_polygon_points(
         self, x: float, y: float, radius: float, sides: int
