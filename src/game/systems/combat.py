@@ -26,10 +26,10 @@ def nearest_enemy(player: Player, enemies: list[Enemy]) -> Enemy | None:
     return best
 
 
-def fire_minigun(player: Player, enemies: list[Enemy], bullets: list[Bullet]) -> None:
+def fire_minigun(player: Player, enemies: list[Enemy]) -> Bullet | None:
     target = nearest_enemy(player, enemies)
     if target is None:
-        return
+        return None
 
     px, py = player.pos
     tx, ty = target.pos
@@ -42,11 +42,13 @@ def fire_minigun(player: Player, enemies: list[Enemy], bullets: list[Bullet]) ->
     vy = math.sin(ang) * BULLET_SPEED
 
     # Use player's bullet damage
-    bullets.append(Bullet(px, py, vx, vy, BULLET_LIFETIME, damage=player.get_bullet_damage()))
+    return Bullet(px, py, vx, vy, BULLET_LIFETIME, damage=player.get_bullet_damage())
 
 
 def update_bullets(bullets: list[Bullet], dt: float) -> list[Bullet]:
     for bullet in bullets:
+        bullet.prev_x = bullet.x
+        bullet.prev_y = bullet.y
         bullet.x += bullet.vx * dt
         bullet.y += bullet.vy * dt
         bullet.ttl -= dt
