@@ -148,7 +148,7 @@ class Game:
             self.rocket_timer += dt
             while self.rocket_timer >= rocket_stats["fire_cooldown"]:
                 self.rocket_timer -= rocket_stats["fire_cooldown"]
-                target_pos = pygame.mouse.get_pos()
+                target_pos = self._screen_to_world(pygame.mouse.get_pos())
                 self.rockets.append(combat.fire_rocket(self.player, target_pos))
 
         if self.player.laser_level >= 0:
@@ -157,7 +157,16 @@ class Game:
             if self.laser_timer >= laser_stats["fire_cooldown"]:
                 self.laser_timer -= laser_stats["fire_cooldown"]
                 px, py = self.player.pos
-                tx, ty = pygame.mouse.get_pos()
+                mx, my = self._screen_to_world(pygame.mouse.get_pos())
+                dx, dy = mx - px, my - py
+                length = max(self.screen.get_width(), self.screen.get_height()) * 1.25
+                if dx == 0 and dy == 0:
+                    nx, ny = (0.0, -1.0)
+                else:
+                    mag = math.hypot(dx, dy)
+                    nx, ny = (dx / mag, dy / mag)
+                tx = px + nx * length
+                ty = py + ny * length
                 beam = LaserBeam(px, py, tx, ty, LASER_LIFETIME)
                 self.lasers.append(beam)
                 collisions.resolve_laser_hits(
@@ -205,15 +214,11 @@ class Game:
             bullet
             for bullet in self.bullets
             if bullet.ttl > 0
-            and -80 < bullet.x < settings.WIDTH + 80
-            and -80 < bullet.y < settings.HEIGHT + 80
         ]
         self.rockets = [
             rocket
             for rocket in self.rockets
             if rocket.ttl > 0
-            and -120 < rocket.x < settings.WIDTH + 120
-            and -120 < rocket.y < settings.HEIGHT + 120
         ]
         self.lasers = [laser for laser in self.lasers if laser.ttl > 0]
 
@@ -292,10 +297,12 @@ class Game:
     def draw(self) -> None:
         if self.state in ("PLAY", "LEVEL_UP", "PAUSE", "WIN", "LOSE"):
             shake_x, shake_y = self._get_shake_offset()
+            cam_x, cam_y = self._get_camera_origin()
         else:
             shake_x, shake_y = (0.0, 0.0)
+            cam_x, cam_y = (0.0, 0.0)
         self.screen.fill(BG)
-        self._draw_background(shake_x, shake_y)
+        self._draw_background(cam_x, cam_y, shake_x, shake_y)
 
         if self.state == "MENU":
             draw_start_menu(self.screen, self.font, self.big_font, self.menu_selection)
@@ -322,57 +329,76 @@ class Game:
         for gem in self.xpgems:
             # Pulse effect
             pulse = int(5 * (1 + 0.3 * (gem.x % 100) / 100))
+            gx, gy = self._world_to_screen(gem.x, gem.y, cam_x, cam_y, shake_x, shake_y)
             pygame.draw.circle(
                 self.screen,
                 NEON_GREEN,
-                (int(gem.x + shake_x), int(gem.y + shake_y)),
+                (gx, gy),
                 pulse,
                 0,
             )
             pygame.draw.circle(
                 self.screen,
                 NEON_CYAN,
-                (int(gem.x + shake_x), int(gem.y + shake_y)),
+                (gx, gy),
                 pulse + 2,
                 1,
             )
 
         for bullet in self.bullets:
+            prev_x, prev_y = self._world_to_screen(
+                bullet.prev_x, bullet.prev_y, cam_x, cam_y, shake_x, shake_y
+            )
+            bullet_x, bullet_y = self._world_to_screen(
+                bullet.x, bullet.y, cam_x, cam_y, shake_x, shake_y
+            )
             pygame.draw.line(
                 self.screen,
                 NEON_YELLOW,
-                (int(bullet.prev_x + shake_x), int(bullet.prev_y + shake_y)),
-                (int(bullet.x + shake_x), int(bullet.y + shake_y)),
+                (prev_x, prev_y),
+                (bullet_x, bullet_y),
                 2,
             )
             pygame.draw.circle(
                 self.screen,
                 NEON_YELLOW,
-                (int(bullet.x + shake_x), int(bullet.y + shake_y)),
+                (bullet_x, bullet_y),
                 BULLET_RADIUS,
             )
 
         for rocket in self.rockets:
+            prev_x, prev_y = self._world_to_screen(
+                rocket.prev_x, rocket.prev_y, cam_x, cam_y, shake_x, shake_y
+            )
+            rocket_x, rocket_y = self._world_to_screen(
+                rocket.x, rocket.y, cam_x, cam_y, shake_x, shake_y
+            )
             pygame.draw.line(
                 self.screen,
                 NEON_ORANGE,
-                (int(rocket.prev_x + shake_x), int(rocket.prev_y + shake_y)),
-                (int(rocket.x + shake_x), int(rocket.y + shake_y)),
+                (prev_x, prev_y),
+                (rocket_x, rocket_y),
                 3,
             )
             pygame.draw.circle(
                 self.screen,
                 NEON_ORANGE,
-                (int(rocket.x + shake_x), int(rocket.y + shake_y)),
+                (rocket_x, rocket_y),
                 6,
             )
 
         for laser in self.lasers:
+            start_x, start_y = self._world_to_screen(
+                laser.start_x, laser.start_y, cam_x, cam_y, shake_x, shake_y
+            )
+            end_x, end_y = self._world_to_screen(
+                laser.end_x, laser.end_y, cam_x, cam_y, shake_x, shake_y
+            )
             pygame.draw.line(
                 self.screen,
                 NEON_CYAN,
-                (int(laser.start_x + shake_x), int(laser.start_y + shake_y)),
-                (int(laser.end_x + shake_x), int(laser.end_y + shake_y)),
+                (start_x, start_y),
+                (end_x, end_y),
                 LASER_WIDTH,
             )
 
@@ -383,17 +409,18 @@ class Game:
             pygame.draw.circle(
                 pulse_surface,
                 (*NEON_MAGENTA, alpha),
-                (int(pulse.x + shake_x), int(pulse.y + shake_y)),
+                self._world_to_screen(pulse.x, pulse.y, cam_x, cam_y, shake_x, shake_y),
                 int(pulse.radius),
                 2,
             )
             self.screen.blit(pulse_surface, (0, 0))
 
         for enemy in self.enemies:
-            self._draw_enemy(enemy, shake_x, shake_y)
+            self._draw_enemy(enemy, cam_x, cam_y, shake_x, shake_y)
 
         px, py = self.player.pos
-        triangle = self._get_player_triangle(px + shake_x, py + shake_y)
+        screen_px, screen_py = self._world_to_screen(px, py, cam_x, cam_y, shake_x, shake_y)
+        triangle = self._get_player_triangle(screen_px, screen_py)
         pygame.draw.polygon(self.screen, (20, 40, 80), triangle, 0)
         pygame.draw.polygon(self.screen, NEON_BLUE, triangle, 2)
         
@@ -411,12 +438,12 @@ class Game:
             pygame.draw.circle(
                 self.screen,
                 shield_color,
-                (int(px + shake_x), int(py + shake_y)),
+                (screen_px, screen_py),
                 shield_radius,
                 2,
             )
 
-        self._draw_particles(shake_x, shake_y)
+        self._draw_particles(cam_x, cam_y, shake_x, shake_y)
 
         draw_hud(
             self.screen,
@@ -552,8 +579,6 @@ class Game:
         flags = pygame.FULLSCREEN if self.fullscreen else 0
         self.screen = pygame.display.set_mode((width, height), flags)
         self.font, self.big_font = assets.load_fonts()
-        self.player.x = min(max(self.player.x, PLAYER_RADIUS), settings.WIDTH - PLAYER_RADIUS)
-        self.player.y = min(max(self.player.y, PLAYER_RADIUS), settings.HEIGHT - PLAYER_RADIUS)
 
     def _select_upgrade(self, index: int) -> None:
         if index < 0 or index >= len(self.upgrade_options):
@@ -586,12 +611,17 @@ class Game:
             particle.vy *= 0.98
         self.particles = [p for p in self.particles if p.ttl > 0]
 
-    def _draw_particles(self, shake_x: float, shake_y: float) -> None:
+    def _draw_particles(
+        self, cam_x: float, cam_y: float, shake_x: float, shake_y: float
+    ) -> None:
         for particle in self.particles:
+            sx, sy = self._world_to_screen(
+                particle.x, particle.y, cam_x, cam_y, shake_x, shake_y
+            )
             pygame.draw.circle(
                 self.screen,
                 particle.color,
-                (int(particle.x + shake_x), int(particle.y + shake_y)),
+                (sx, sy),
                 max(1, int(particle.radius)),
             )
 
@@ -649,28 +679,33 @@ class Game:
                 )
             )
 
-    def _draw_background(self, shake_x: float, shake_y: float) -> None:
+    def _draw_background(
+        self, cam_x: float, cam_y: float, shake_x: float, shake_y: float
+    ) -> None:
         spacing = 60
-        offset_x = (self.player.x * 0.3 + self.elapsed * 24) % spacing
-        offset_y = (self.player.y * 0.3 + self.elapsed * 18) % spacing
         grid_color = (12, 12, 24)
+        width, height = self.screen.get_size()
+        start_world_x = int(math.floor(cam_x / spacing) * spacing)
+        start_world_y = int(math.floor(cam_y / spacing) * spacing)
+        end_world_x = int(cam_x + width + spacing)
+        end_world_y = int(cam_y + height + spacing)
 
-        for x in range(-spacing, settings.WIDTH + spacing, spacing):
-            xpos = x - offset_x + shake_x
+        for world_x in range(start_world_x, end_world_x, spacing):
+            xpos = int(world_x - cam_x + shake_x)
             pygame.draw.line(
                 self.screen,
                 grid_color,
-                (int(xpos), int(0 + shake_y)),
-                (int(xpos), int(settings.HEIGHT + shake_y)),
+                (xpos, int(0 + shake_y)),
+                (xpos, int(height + shake_y)),
                 1,
             )
-        for y in range(-spacing, settings.HEIGHT + spacing, spacing):
-            ypos = y - offset_y + shake_y
+        for world_y in range(start_world_y, end_world_y, spacing):
+            ypos = int(world_y - cam_y + shake_y)
             pygame.draw.line(
                 self.screen,
                 grid_color,
-                (int(0 + shake_x), int(ypos)),
-                (int(settings.WIDTH + shake_x), int(ypos)),
+                (int(0 + shake_x), ypos),
+                (int(width + shake_x), ypos),
                 1,
             )
 
@@ -682,9 +717,10 @@ class Game:
             (x + size * 0.85, y + size * 0.7),
         ]
 
-    def _draw_enemy(self, enemy: Enemy, shake_x: float, shake_y: float) -> None:
-        ex = enemy.x + shake_x
-        ey = enemy.y + shake_y
+    def _draw_enemy(
+        self, enemy: Enemy, cam_x: float, cam_y: float, shake_x: float, shake_y: float
+    ) -> None:
+        ex, ey = self._world_to_screen(enemy.x, enemy.y, cam_x, cam_y, shake_x, shake_y)
         outline_color = NEON_MAGENTA if enemy.is_boss else RED
         fill_color = (80, 0, 80) if enemy.is_boss else (60, 0, 0)
 
@@ -709,6 +745,28 @@ class Game:
         inner_points = self._get_polygon_points(ex, ey, max(1.0, enemy.radius - 3), enemy.sides)
         pygame.draw.polygon(self.screen, outline_color, points, 2)
         pygame.draw.polygon(self.screen, fill_color, inner_points, 0)
+
+    def _get_camera_origin(self) -> tuple[float, float]:
+        width, height = self.screen.get_size()
+        return (self.player.x - width / 2.0, self.player.y - height / 2.0)
+
+    def _world_to_screen(
+        self,
+        world_x: float,
+        world_y: float,
+        cam_x: float,
+        cam_y: float,
+        shake_x: float = 0.0,
+        shake_y: float = 0.0,
+    ) -> tuple[int, int]:
+        return (
+            int(world_x - cam_x + shake_x),
+            int(world_y - cam_y + shake_y),
+        )
+
+    def _screen_to_world(self, screen_pos: tuple[int, int]) -> tuple[float, float]:
+        cam_x, cam_y = self._get_camera_origin()
+        return (screen_pos[0] + cam_x, screen_pos[1] + cam_y)
 
     def _get_polygon_points(
         self, x: float, y: float, radius: float, sides: int
