@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import random
 
 from game.entities.enemy import Enemy
@@ -23,7 +24,9 @@ class Spawner:
         self.spawn_interval = ENEMY_SPAWN_INTERVAL_START
         self.spawn_timer = 0.0
 
-    def update(self, dt: float, elapsed: float, enemies: list[Enemy]) -> None:
+    def update(
+        self, dt: float, elapsed: float, enemies: list[Enemy], player_pos: tuple[float, float]
+    ) -> None:
         self.spawn_timer += dt
         self.spawn_interval = max(
             ENEMY_SPAWN_INTERVAL_MIN,
@@ -31,23 +34,16 @@ class Spawner:
         )
         while self.spawn_timer >= self.spawn_interval:
             self.spawn_timer -= self.spawn_interval
-            enemies.append(self._spawn_enemy(elapsed))
+            enemies.append(self._spawn_enemy(elapsed, player_pos))
 
-    def _spawn_enemy(self, elapsed: float) -> Enemy:
-        edge = random.choice(["L", "R", "T", "B"])
-        margin = 40
-        if edge == "L":
-            x = -margin
-            y = random.uniform(0, HEIGHT)
-        elif edge == "R":
-            x = WIDTH + margin
-            y = random.uniform(0, HEIGHT)
-        elif edge == "T":
-            x = random.uniform(0, WIDTH)
-            y = -margin
-        else:
-            x = random.uniform(0, WIDTH)
-            y = HEIGHT + margin
+    def _spawn_enemy(self, elapsed: float, player_pos: tuple[float, float]) -> Enemy:
+        px, py = player_pos
+        view_radius = max(WIDTH, HEIGHT) * 0.65
+        margin = 140
+        distance = view_radius + margin
+        angle = random.uniform(0, math.tau)
+        x = px + math.cos(angle) * distance
+        y = py + math.sin(angle) * distance
 
         speed = ENEMY_BASE_SPEED + min(180.0, elapsed * 2.0)
         hp = 26 + int(min(40, elapsed * 0.25))

@@ -24,6 +24,8 @@ def resolve_bullet_hits(
     enemies: list[Enemy],
     player: Player,
     xpgems: list[XPGem],
+    death_positions: list[tuple[float, float]],
+    hit_positions: list[tuple[float, float]],
 ) -> None:
     """Handle bullet collisions and spawn XP gems for killed enemies."""
     for bullet in bullets:
@@ -32,6 +34,7 @@ def resolve_bullet_hits(
                 enemy.hp -= bullet.damage
                 player.damage_dealt += bullet.damage
                 bullet.ttl = 0
+                hit_positions.append((bullet.x, bullet.y))
                 
                 # Spawn XP gem if enemy dies
                 if enemy.hp <= 0:
@@ -39,21 +42,23 @@ def resolve_bullet_hits(
                     # XP value based on enemy HP (weaker enemies give less)
                     xp_value = max(5, int(enemy.hp + bullet.damage)) // 3
                     xpgems.append(XPGem(x=enemy.x, y=enemy.y, value=xp_value))
+                    death_positions.append((enemy.x, enemy.y))
                 
                 break
 
 
-def resolve_player_hits(player: Player, enemies: list[Enemy], dt: float) -> None:
+def resolve_player_hits(player: Player, enemies: list[Enemy], dt: float) -> float:
     """Handle enemy-player collisions, with shield damage absorption."""
     px, py = player.pos
+    total_damage = 0.0
     
     for enemy in enemies:
         if dist2(px, py, enemy.x, enemy.y) <= (PLAYER_RADIUS + ENEMY_RADIUS) ** 2:
             damage = 25 * dt
+            total_damage += damage
             
             # Shield absorbs damage first
             if player.shield_level > 0 and player.shield_hp > 0:
-                shield_max = player.get_shield_max()
                 if player.shield_hp >= damage:
                     player.shield_hp -= damage
                 else:
@@ -62,3 +67,5 @@ def resolve_player_hits(player: Player, enemies: list[Enemy], dt: float) -> None
                     player.hp -= remaining
             else:
                 player.hp -= damage
+
+    return total_damage
