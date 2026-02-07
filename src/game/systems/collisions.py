@@ -142,7 +142,7 @@ def resolve_player_hits(player: Player, enemies: list[Enemy], dt: float) -> floa
             total_damage += damage
             
             # Shield absorbs damage first
-            if player.shield_level > 0 and player.shield_hp > 0:
+            if player.shield_level >= 0 and player.shield_hp > 0:
                 if player.shield_hp >= damage:
                     player.shield_hp -= damage
                 else:

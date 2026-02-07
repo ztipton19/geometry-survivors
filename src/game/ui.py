@@ -18,18 +18,17 @@ def draw_hud(
     screen: pygame.Surface,
     font: pygame.font.Font,
     player: Player,
-    fire_cd: float,
     enemy_count: int,
     remaining: float,
 ) -> None:
     mm = int(remaining) // 60
     ss = int(remaining) % 60
     timer_text = f"{mm:02d}:{ss:02d}"
-    shield_text = ""
+    shield_text = "   SHIELD ---"
     if player.shield_level >= 0:
         shield_text = f"   SHIELD {int(player.shield_hp):3d}/{int(player.shield_max):3d}"
     hud = font.render(
-        f"HP {int(player.hp):3d}{shield_text}   FIRE {fire_cd:.2f}s   ENEMIES {enemy_count:3d}   TIME {timer_text}",
+        f"HP {int(player.hp):3d}{shield_text}   ENEMIES {enemy_count:3d}   TIME {timer_text}",
         True,
         WHITE,
     )
@@ -48,18 +47,63 @@ def draw_xp_bar(
     width: int = 200,
 ) -> None:
     """Draw XP progress bar."""
+    bar_height = 20
     # Background
-    pygame.draw.rect(screen, (30, 30, 30), (x, y, width, 16), 0, 4)
+    pygame.draw.rect(screen, (30, 30, 30), (x, y, width, bar_height), 0, 4)
     # Fill
     if player.xp_to_next > 0:
         fill_width = int((player.xp / player.xp_to_next) * width)
         fill_width = min(fill_width, width)
-        pygame.draw.rect(screen, NEON_CYAN, (x, y, fill_width, 16), 0, 4)
+        pygame.draw.rect(screen, NEON_CYAN, (x, y, fill_width, bar_height), 0, 4)
     # Border
-    pygame.draw.rect(screen, WHITE, (x, y, width, 16), 1, 4)
-    # Text
-    level_text = font.render(f"LVL {player.level}", True, WHITE)
-    screen.blit(level_text, (x + width // 2 - level_text.get_width() // 2, y + 1))
+    pygame.draw.rect(screen, WHITE, (x, y, width, bar_height), 1, 4)
+    # Text (smaller font to keep it fully inside the bar)
+    level_font = pygame.font.SysFont("consolas", 14)
+    level_text = level_font.render(f"LVL {player.level}", True, WHITE)
+    screen.blit(
+        level_text,
+        (
+            x + width // 2 - level_text.get_width() // 2,
+            y + (bar_height - level_text.get_height()) // 2,
+        ),
+    )
+
+
+def get_level_up_card_rects(
+    screen: pygame.Surface,
+    option_count: int,
+) -> list[pygame.Rect]:
+    """Get card rectangles for level-up options."""
+    width, height = screen.get_size()
+    card_width = min(760, max(560, width - 120))
+    card_height = 130
+    gap = 18
+    total_height = option_count * card_height + max(0, option_count - 1) * gap
+    start_y = max(190, (height - total_height) // 2 + 20)
+    start_x = (width - card_width) // 2
+    return [
+        pygame.Rect(start_x, start_y + i * (card_height + gap), card_width, card_height)
+        for i in range(option_count)
+    ]
+
+
+def _wrap_text(
+    font: pygame.font.Font, text: str, max_width: int
+) -> list[str]:
+    words = text.split()
+    if not words:
+        return [""]
+    lines: list[str] = []
+    current = words[0]
+    for word in words[1:]:
+        test = f"{current} {word}"
+        if font.size(test)[0] <= max_width:
+            current = test
+        else:
+            lines.append(current)
+            current = word
+    lines.append(current)
+    return lines
 
 
 def draw_level_up_screen(
@@ -84,68 +128,57 @@ def draw_level_up_screen(
     screen.blit(subtitle, (width // 2 - subtitle.get_width() // 2, 150))
     
     # Draw upgrade cards
-    card_width = 320
-    card_height = 220
-    card_y = 200
-    gap = 30
-    total_width = (card_width * 3) + (gap * 2)
-    start_x = (width - total_width) // 2
-    
+    card_rects = get_level_up_card_rects(screen, len(options))
     colors = [NEON_CYAN, NEON_MAGENTA, NEON_GREEN]
     
     for i, option_id in enumerate(options):
         upgrade = UPGRADES[option_id]
-        card_x = start_x + i * (card_width + gap)
+        card = card_rects[i]
         
         # Card background
         pygame.draw.rect(
-            screen, (40, 40, 50), (card_x, card_y, card_width, card_height), 0, 10
+            screen, (40, 40, 50), card, 0, 10
         )
         pygame.draw.rect(
-            screen, colors[i], (card_x, card_y, card_width, card_height), 2, 10
+            screen, colors[i], card, 2, 10
         )
         
         # Option number
         num_text = big_font.render(str(i + 1), True, colors[i])
-        screen.blit(num_text, (card_x + 15, card_y + 15))
+        screen.blit(num_text, (card.x + 15, card.y + 6))
         
         # Upgrade name
         name_text = font.render(upgrade.name, True, WHITE)
-        screen.blit(name_text, (card_x + 60, card_y + 20))
+        screen.blit(name_text, (card.x + 70, card.y + 18))
         
         current_level = getattr(player, f"{option_id}_level", 0)
         if current_level < 0:
             description = upgrade.get_description(-1)
-            desc_text = font.render(description, True, (200, 200, 200))
-            screen.blit(
-                desc_text,
-                (card_x + card_width // 2 - desc_text.get_width() // 2, card_y + 60),
-            )
+            detail_lines = _wrap_text(font, description, card.width - 170)
         else:
             next_level = min(current_level + 1, upgrade.max_level)
             current_desc = upgrade.get_description(current_level)
             next_desc = upgrade.get_description(next_level)
-            current_text = font.render(f"Current: {current_desc}", True, (200, 200, 200))
-            next_text = font.render(f"Next: {next_desc}", True, (200, 200, 200))
-            screen.blit(
-                current_text,
-                (
-                    card_x + card_width // 2 - current_text.get_width() // 2,
-                    card_y + 60,
-                ),
+            detail_lines = _wrap_text(
+                font,
+                f"Current: {current_desc} | Next: {next_desc}",
+                card.width - 170,
             )
-            screen.blit(
-                next_text,
-                (card_x + card_width // 2 - next_text.get_width() // 2, card_y + 90),
-            )
+        for line_idx, line in enumerate(detail_lines[:3]):
+            desc_text = font.render(line, True, (200, 200, 200))
+            screen.blit(desc_text, (card.x + 70, card.y + 48 + line_idx * 22))
         
         # Category badge
         category_text = font.render(upgrade.category.upper(), True, colors[i])
-        screen.blit(category_text, (card_x + card_width // 2 - category_text.get_width() // 2, card_y + 115))
+        screen.blit(category_text, (card.right - 140, card.y + 18))
         
         # Press to select hint
-        hint_text = font.render("Press " + str(i + 1) + " to select", True, (150, 150, 150))
-        screen.blit(hint_text, (card_x + card_width // 2 - hint_text.get_width() // 2, card_y + card_height - 30))
+        hint_text = font.render(
+            "Press " + str(i + 1) + " or click to select",
+            True,
+            (150, 150, 150),
+        )
+        screen.blit(hint_text, (card.right - hint_text.get_width() - 16, card.bottom - 28))
 
 
 def draw_end_screen(

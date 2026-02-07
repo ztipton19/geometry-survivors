@@ -39,6 +39,7 @@ from game.ui import (
     draw_end_screen,
     draw_hud,
     draw_intro_screen,
+    get_level_up_card_rects,
     draw_level_up_screen,
     draw_options_menu,
     draw_pause_menu,
@@ -88,6 +89,7 @@ class Game:
         
         # Upgrade system
         self.upgrade_options: list[str] = []
+        self.upgrade_resume_grace = 0.0
 
     def restart(self) -> None:
         self.player = Player(settings.WIDTH / 2, settings.HEIGHT / 2)
@@ -108,9 +110,13 @@ class Game:
         self.elapsed, self.remaining = progression.reset_timer()
         self.state = "PLAY"
         self.upgrade_options.clear()
+        self.upgrade_resume_grace = 0.0
 
     def update(self, dt: float) -> None:
         if self.state != "PLAY":
+            return
+        if self.upgrade_resume_grace > 0:
+            self.upgrade_resume_grace = max(0.0, self.upgrade_resume_grace - dt)
             return
 
         self.elapsed, self.remaining, completed = progression.update_timer(
@@ -388,11 +394,19 @@ class Game:
         pygame.draw.polygon(self.screen, NEON_BLUE, triangle, 2)
         
         # Draw shield if active
-        if self.player.shield_level > 0 and self.player.shield_hp > 0:
-            shield_radius = PLAYER_RADIUS + 5
+        if self.player.shield_level >= 0 and self.player.shield_hp > 0:
+            shield_radius = PLAYER_RADIUS + 6
+            shield_ratio = 0.0
+            if self.player.shield_max > 0:
+                shield_ratio = max(0.0, min(1.0, self.player.shield_hp / self.player.shield_max))
+            shield_color = (
+                int(80 + 70 * shield_ratio),
+                int(120 + 80 * shield_ratio),
+                255,
+            )
             pygame.draw.circle(
                 self.screen,
-                (100, 100, 255),
+                shield_color,
                 (int(px + shake_x), int(py + shake_y)),
                 shield_radius,
                 2,
@@ -404,7 +418,6 @@ class Game:
             self.screen,
             self.font,
             self.player,
-            self.player.get_fire_cooldown(),
             len(self.enemies),
             self.remaining,
         )
@@ -501,17 +514,26 @@ class Game:
                             self.restart()
                         elif event.key == pygame.K_ESCAPE:
                             self.running = False
-                    # Level-up selection
+                    # Level-up key selection
                     if self.state == "LEVEL_UP":
                         if event.key == pygame.K_1 and len(self.upgrade_options) >= 1:
-                            upgrades.apply_upgrade(self.player, self.upgrade_options[0])
-                            self.state = "PLAY"
+                            self._select_upgrade(0)
                         elif event.key == pygame.K_2 and len(self.upgrade_options) >= 2:
-                            upgrades.apply_upgrade(self.player, self.upgrade_options[1])
-                            self.state = "PLAY"
+                            self._select_upgrade(1)
                         elif event.key == pygame.K_3 and len(self.upgrade_options) >= 3:
-                            upgrades.apply_upgrade(self.player, self.upgrade_options[2])
-                            self.state = "PLAY"
+                            self._select_upgrade(2)
+                elif (
+                    event.type == pygame.MOUSEBUTTONDOWN
+                    and event.button == 1
+                    and self.state == "LEVEL_UP"
+                ):
+                    card_rects = get_level_up_card_rects(
+                        self.screen, len(self.upgrade_options)
+                    )
+                    for i, rect in enumerate(card_rects):
+                        if rect.collidepoint(event.pos):
+                            self._select_upgrade(i)
+                            break
 
             self.update(dt)
             self.draw()
@@ -528,6 +550,14 @@ class Game:
         self.font, self.big_font = assets.load_fonts()
         self.player.x = min(max(self.player.x, PLAYER_RADIUS), settings.WIDTH - PLAYER_RADIUS)
         self.player.y = min(max(self.player.y, PLAYER_RADIUS), settings.HEIGHT - PLAYER_RADIUS)
+
+    def _select_upgrade(self, index: int) -> None:
+        if index < 0 or index >= len(self.upgrade_options):
+            return
+        upgrades.apply_upgrade(self.player, self.upgrade_options[index])
+        self.state = "PLAY"
+        self.upgrade_options.clear()
+        self.upgrade_resume_grace = 0.5
 
     def _get_shake_offset(self) -> tuple[float, float]:
         if self.shake_timer <= 0:
