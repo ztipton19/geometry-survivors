@@ -58,6 +58,12 @@ class Upgrade:
                 return "Unlock: Shield system"
             shield = int(self.values[level]["shield_max"])
             return f"Shield: +{shield} max shield, regenerates"
+
+        elif self.id == "tractor":
+            radius = int(self.values[level]["pickup_radius"])
+            if radius <= 0:
+                return "Tractor Beam: Manual pickup only"
+            return f"Tractor Beam: {radius}px pickup radius"
         
         return self.description
 
@@ -158,6 +164,21 @@ UPGRADES: dict[str, Upgrade] = {
             {"shield_max": 112, "regen_rate": 10.0, "regen_delay": 2.0},
         ],
     ),
+    "tractor": Upgrade(
+        id="tractor",
+        name="Tractor Beam",
+        description="Magnetize XP gems toward the drone",
+        category="utility",
+        max_level=5,
+        values=[
+            {"pickup_radius": 0},
+            {"pickup_radius": 50},
+            {"pickup_radius": 100},
+            {"pickup_radius": 150},
+            {"pickup_radius": 200},
+            {"pickup_radius": 250},
+        ],
+    ),
 }
 
 
@@ -180,5 +201,8 @@ def get_available_upgrades(player_level: int, unlocked_weapons: set[str]) -> lis
         available.append("emp")
     if player_level >= 9 and "shield" not in unlocked_weapons:
         available.append("shield")
+    
+    # Tractor beam upgrades are always available
+    available.append("tractor")
     
     return available

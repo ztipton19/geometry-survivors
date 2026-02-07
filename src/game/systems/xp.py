@@ -31,7 +31,8 @@ def update_xp_gems(
         px, py = player.pos
         d2 = dist2(gem.x, gem.y, px, py)
         
-        if d2 < gem.magnet_range ** 2:
+        magnet_range = player.get_tractor_range()
+        if d2 < magnet_range ** 2:
             # Accelerate toward player
             d = math.sqrt(d2)
             if d > 0:

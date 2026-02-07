@@ -12,21 +12,29 @@ from game import assets
 from game.entities.bullet import Bullet
 from game.entities.enemy import Enemy
 from game.entities.particle import Particle
+from game.entities.emp_pulse import EmpPulse
+from game.entities.laser import LaserBeam
 from game.entities.player import Player
+from game.entities.rocket import Rocket
 from game.entities.xpgem import XPGem
 from game.input import handle_player_input
 from game.settings import (
     BG,
     BULLET_RADIUS,
+    EMP_PULSE_LIFETIME,
     FPS,
     HEIGHT,
     NEON_BLUE,
     NEON_CYAN,
     NEON_GREEN,
+    NEON_MAGENTA,
+    NEON_ORANGE,
     NEON_YELLOW,
     PLAYER_RADIUS,
     RED,
     WIDTH,
+    LASER_LIFETIME,
+    LASER_WIDTH,
 )
 from game.systems import collisions, combat, progression, spawner, upgrades, xp
 from game.ui import draw_end_screen, draw_hud, draw_level_up_screen
@@ -43,10 +51,16 @@ class Game:
         self.player = Player(WIDTH / 2, HEIGHT / 2)
         self.enemies: list[Enemy] = []
         self.bullets: list[Bullet] = []
+        self.rockets: list[Rocket] = []
+        self.lasers: list[LaserBeam] = []
+        self.emp_pulses: list[EmpPulse] = []
         self.xpgems: list[XPGem] = []
         self.particles: list[Particle] = []
 
         self.fire_timer = 0.0
+        self.rocket_timer = 0.0
+        self.laser_timer = 0.0
+        self.emp_timer = 0.0
         self.shake_timer = 0.0
         self.shake_strength = 0.0
 
@@ -63,9 +77,15 @@ class Game:
         self.player = Player(WIDTH / 2, HEIGHT / 2)
         self.enemies.clear()
         self.bullets.clear()
+        self.rockets.clear()
+        self.lasers.clear()
+        self.emp_pulses.clear()
         self.xpgems.clear()
         self.particles.clear()
         self.fire_timer = 0.0
+        self.rocket_timer = 0.0
+        self.laser_timer = 0.0
+        self.emp_timer = 0.0
         self.shake_timer = 0.0
         self.shake_strength = 0.0
         self.spawner.reset()
@@ -88,6 +108,9 @@ class Game:
 
         self.spawner.update(dt, self.elapsed, self.enemies, self.player.pos)
 
+        death_positions: list[tuple[float, float]] = []
+        hit_positions: list[tuple[float, float]] = []
+
         # Use player's fire cooldown
         fire_cd = self.player.get_fire_cooldown()
         self.fire_timer += dt
@@ -98,18 +121,87 @@ class Game:
                 self.bullets.append(bullet)
                 self._spawn_muzzle_flash(bullet)
 
+        if self.player.rockets_level >= 0:
+            rocket_stats = self.player.get_rocket_stats()
+            self.rocket_timer += dt
+            while self.rocket_timer >= rocket_stats["fire_cooldown"]:
+                self.rocket_timer -= rocket_stats["fire_cooldown"]
+                target_pos = pygame.mouse.get_pos()
+                self.rockets.append(combat.fire_rocket(self.player, target_pos))
+
+        if self.player.laser_level >= 0:
+            laser_stats = self.player.get_laser_stats()
+            self.laser_timer += dt
+            if self.laser_timer >= laser_stats["fire_cooldown"]:
+                self.laser_timer -= laser_stats["fire_cooldown"]
+                px, py = self.player.pos
+                tx, ty = pygame.mouse.get_pos()
+                beam = LaserBeam(px, py, tx, ty, LASER_LIFETIME)
+                self.lasers.append(beam)
+                collisions.resolve_laser_hits(
+                    self.player,
+                    self.enemies,
+                    (px, py),
+                    (tx, ty),
+                    laser_stats["damage"],
+                    LASER_WIDTH,
+                    self.xpgems,
+                    death_positions,
+                    hit_positions,
+                )
+
+        if self.player.emp_level >= 0:
+            emp_stats = self.player.get_emp_stats()
+            self.emp_timer += dt
+            if self.emp_timer >= 0.5:
+                self.emp_timer -= 0.5
+                self.emp_pulses.append(
+                    EmpPulse(
+                        x=self.player.x,
+                        y=self.player.y,
+                        radius=emp_stats["radius"],
+                        ttl=EMP_PULSE_LIFETIME,
+                    )
+                )
+                for enemy in self.enemies:
+                    if (enemy.x - self.player.x) ** 2 + (enemy.y - self.player.y) ** 2 <= emp_stats[
+                        "radius"
+                    ] ** 2:
+                        collisions.apply_enemy_damage(
+                            enemy,
+                            emp_stats["damage"],
+                            self.player,
+                            self.xpgems,
+                            death_positions,
+                            hit_positions,
+                            (enemy.x, enemy.y),
+                        )
+
         combat.update_bullets(self.bullets, dt)
+        combat.update_rockets(self.rockets, dt)
         self.bullets = [
             bullet
             for bullet in self.bullets
             if bullet.ttl > 0 and -80 < bullet.x < WIDTH + 80 and -80 < bullet.y < HEIGHT + 80
         ]
+        self.rockets = [
+            rocket
+            for rocket in self.rockets
+            if rocket.ttl > 0 and -120 < rocket.x < WIDTH + 120 and -120 < rocket.y < HEIGHT + 120
+        ]
+        self.lasers = [laser for laser in self.lasers if laser.ttl > 0]
 
         collisions.update_enemy_positions(self.enemies, self.player, dt)
-        death_positions: list[tuple[float, float]] = []
-        hit_positions: list[tuple[float, float]] = []
         collisions.resolve_bullet_hits(
             self.bullets,
+            self.enemies,
+            self.player,
+            self.xpgems,
+            death_positions,
+            hit_positions,
+        )
+        collisions.resolve_rocket_hits(
+            self.rockets,
             self.enemies,
             self.player,
             self.xpgems,
@@ -120,6 +212,21 @@ class Game:
         total_damage = collisions.resolve_player_hits(self.player, self.enemies, dt)
         if total_damage > 0:
             self._add_screen_shake(min(6.0, 2.0 + total_damage * 1.5))
+            if self.player.shield_level >= 0:
+                self.player.shield_regen_delay = self.player.get_shield_regen_delay()
+
+        if self.player.shield_level >= 0:
+            self.player.shield_max = self.player.get_shield_max()
+            if self.player.shield_hp < self.player.shield_max:
+                if self.player.shield_regen_delay > 0:
+                    self.player.shield_regen_delay = max(
+                        0.0, self.player.shield_regen_delay - dt
+                    )
+                else:
+                    regen_rate = self.player.get_shield_regen_rate()
+                    self.player.shield_hp = min(
+                        self.player.shield_max, self.player.shield_hp + regen_rate * dt
+                    )
 
         for pos in death_positions:
             self._spawn_explosion(pos, RED, 12)
@@ -144,6 +251,11 @@ class Game:
             self.state = "LOSE"
 
         self._update_particles(dt)
+        for laser in self.lasers:
+            laser.ttl -= dt
+        for pulse in self.emp_pulses:
+            pulse.ttl -= dt
+        self.emp_pulses = [pulse for pulse in self.emp_pulses if pulse.ttl > 0]
         if self.shake_timer > 0:
             self.shake_timer = max(0.0, self.shake_timer - dt)
 
@@ -186,6 +298,42 @@ class Game:
                 BULLET_RADIUS,
             )
 
+        for rocket in self.rockets:
+            pygame.draw.line(
+                self.screen,
+                NEON_ORANGE,
+                (int(rocket.prev_x + shake_x), int(rocket.prev_y + shake_y)),
+                (int(rocket.x + shake_x), int(rocket.y + shake_y)),
+                3,
+            )
+            pygame.draw.circle(
+                self.screen,
+                NEON_ORANGE,
+                (int(rocket.x + shake_x), int(rocket.y + shake_y)),
+                6,
+            )
+
+        for laser in self.lasers:
+            pygame.draw.line(
+                self.screen,
+                NEON_CYAN,
+                (int(laser.start_x + shake_x), int(laser.start_y + shake_y)),
+                (int(laser.end_x + shake_x), int(laser.end_y + shake_y)),
+                LASER_WIDTH,
+            )
+
+        for pulse in self.emp_pulses:
+            alpha = int(200 * (pulse.ttl / EMP_PULSE_LIFETIME))
+            pulse_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+            pygame.draw.circle(
+                pulse_surface,
+                (*NEON_MAGENTA, alpha),
+                (int(pulse.x + shake_x), int(pulse.y + shake_y)),
+                int(pulse.radius),
+                2,
+            )
+            self.screen.blit(pulse_surface, (0, 0))
+
         for enemy in self.enemies:
             self._draw_enemy(enemy, shake_x, shake_y)
 
@@ -223,6 +371,7 @@ class Game:
                 self.font,
                 self.big_font,
                 self.upgrade_options,
+                self.player,
             )
         
         draw_end_screen(self.screen, self.font, self.big_font, self.state, self.player)
