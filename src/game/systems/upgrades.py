@@ -70,5 +70,9 @@ def apply_upgrade(player: Player, upgrade_id: str) -> None:
         # Initialize shield if newly unlocked
         if current_level < 0:
             player.shield_hp = player.get_shield_max()
+        else:
+            player.shield_hp = min(player.shield_hp, player.get_shield_max())
+    elif upgrade_id == "tractor":
+        player.tractor_level = new_level
     
     player.upgrades_collected += 1

@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 
 from game.settings import PLAYER_MAX_HP
+from game.upgrades import UPGRADES
 
 
 @dataclass
@@ -20,6 +21,8 @@ class Player:
     shield_level: int = -1
     shield_hp: float = 0.0
     shield_max: float = 50.0
+    shield_regen_delay: float = 0.0
+    tractor_level: int = 0
     # Stats
     max_hp: float = PLAYER_MAX_HP
     bullet_damage: float = 12.0
@@ -48,15 +51,53 @@ class Player:
         return base * (1.0 + 0.25 * self.health_level)
 
     def get_shield_max(self) -> float:
-        base = 50.0
-        return base * (1.0 + 0.25 * self.shield_level) if self.shield_level > 0 else 0.0
+        if self.shield_level < 0:
+            return 0.0
+        values = UPGRADES["shield"].values[self.shield_level]
+        return float(values["shield_max"])
+
+    def get_shield_regen_rate(self) -> float:
+        if self.shield_level < 0:
+            return 0.0
+        values = UPGRADES["shield"].values[self.shield_level]
+        return float(values["regen_rate"])
+
+    def get_shield_regen_delay(self) -> float:
+        if self.shield_level < 0:
+            return 0.0
+        values = UPGRADES["shield"].values[self.shield_level]
+        return float(values["regen_delay"])
 
     def get_fire_cooldown(self) -> float:
-        base = 0.14
-        reduction = 0.01 * self.minigun_level
-        return max(0.04, base - reduction)
+        values = UPGRADES["minigun"].values[self.minigun_level]
+        return float(values["fire_cooldown"])
 
     def get_bullet_damage(self) -> float:
-        base = 12.0
-        increase = 2.0 * self.minigun_level
-        return base + increase
+        values = UPGRADES["minigun"].values[self.minigun_level]
+        return float(values["bullet_damage"])
+
+    def get_rocket_stats(self) -> dict[str, float]:
+        values = UPGRADES["rockets"].values[self.rockets_level]
+        return {
+            "damage": float(values["damage"]),
+            "splash_radius": float(values["splash_radius"]),
+            "fire_cooldown": float(values["fire_cooldown"]),
+        }
+
+    def get_laser_stats(self) -> dict[str, float]:
+        values = UPGRADES["laser"].values[self.laser_level]
+        return {
+            "damage": float(values["damage"]),
+            "fire_cooldown": float(values["fire_cooldown"]),
+        }
+
+    def get_emp_stats(self) -> dict[str, float]:
+        values = UPGRADES["emp"].values[self.emp_level]
+        return {
+            "damage": float(values["damage"]),
+            "radius": float(values["radius"]),
+        }
+
+    def get_tractor_range(self) -> float:
+        values = UPGRADES["tractor"].values[self.tractor_level]
+        return float(values["pickup_radius"])

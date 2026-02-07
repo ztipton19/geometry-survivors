@@ -8,7 +8,8 @@ import random
 from game.entities.bullet import Bullet
 from game.entities.enemy import Enemy
 from game.entities.player import Player
-from game.settings import BULLET_LIFETIME, BULLET_SPEED
+from game.entities.rocket import Rocket
+from game.settings import BULLET_LIFETIME, BULLET_SPEED, ROCKET_LIFETIME, ROCKET_SPEED
 from game.util import dist2, norm
 
 
@@ -45,6 +46,27 @@ def fire_minigun(player: Player, enemies: list[Enemy]) -> Bullet | None:
     return Bullet(px, py, vx, vy, BULLET_LIFETIME, damage=player.get_bullet_damage())
 
 
+def fire_rocket(player: Player, target_pos: tuple[float, float]) -> Rocket:
+    px, py = player.pos
+    tx, ty = target_pos
+    dx, dy = tx - px, ty - py
+    nx, ny = norm(dx, dy)
+    vx = nx * ROCKET_SPEED
+    vy = ny * ROCKET_SPEED
+    stats = player.get_rocket_stats()
+    return Rocket(
+        px,
+        py,
+        vx,
+        vy,
+        tx,
+        ty,
+        ROCKET_LIFETIME,
+        damage=stats["damage"],
+        splash_radius=stats["splash_radius"],
+    )
+
+
 def update_bullets(bullets: list[Bullet], dt: float) -> list[Bullet]:
     for bullet in bullets:
         bullet.prev_x = bullet.x
@@ -53,3 +75,13 @@ def update_bullets(bullets: list[Bullet], dt: float) -> list[Bullet]:
         bullet.y += bullet.vy * dt
         bullet.ttl -= dt
     return bullets
+
+
+def update_rockets(rockets: list[Rocket], dt: float) -> list[Rocket]:
+    for rocket in rockets:
+        rocket.prev_x = rocket.x
+        rocket.prev_y = rocket.y
+        rocket.x += rocket.vx * dt
+        rocket.y += rocket.vy * dt
+        rocket.ttl -= dt
+    return rockets

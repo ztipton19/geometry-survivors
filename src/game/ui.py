@@ -30,8 +30,11 @@ def draw_hud(
     mm = int(remaining) // 60
     ss = int(remaining) % 60
     timer_text = f"{mm:02d}:{ss:02d}"
+    shield_text = ""
+    if player.shield_level >= 0:
+        shield_text = f"   SHIELD {int(player.shield_hp):3d}/{int(player.shield_max):3d}"
     hud = font.render(
-        f"HP {int(player.hp):3d}   FIRE {fire_cd:.2f}s   ENEMIES {enemy_count:3d}   TIME {timer_text}",
+        f"HP {int(player.hp):3d}{shield_text}   FIRE {fire_cd:.2f}s   ENEMIES {enemy_count:3d}   TIME {timer_text}",
         True,
         WHITE,
     )
@@ -69,6 +72,7 @@ def draw_level_up_screen(
     font: pygame.font.Font,
     big_font: pygame.font.Font,
     options: list[str],
+    player: Player,
 ) -> None:
     """Draw level-up upgrade selection screen."""
     # Semi-transparent overlay
@@ -113,11 +117,14 @@ def draw_level_up_screen(
         name_text = font.render(upgrade.name, True, WHITE)
         screen.blit(name_text, (card_x + 60, card_y + 20))
         
-        # Upgrade description
-        desc_text = font.render(upgrade.description, True, (200, 200, 200))
+        current_level = getattr(player, f"{option_id}_level", 0)
+        display_level = current_level + 1 if current_level >= 0 else -1
+        display_level = min(display_level, upgrade.max_level)
+        description = upgrade.get_description(display_level)
+        desc_text = font.render(description, True, (200, 200, 200))
         # Wrap text if too long
         if desc_text.get_width() > card_width - 40:
-            words = upgrade.description.split()
+            words = description.split()
             line1 = " ".join(words[:len(words)//2])
             line2 = " ".join(words[len(words)//2:])
             line1_text = font.render(line1, True, (200, 200, 200))
