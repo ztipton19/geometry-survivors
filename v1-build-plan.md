@@ -52,7 +52,7 @@ A Geometry Wars + Vampire Survivors hybrid where you pilot a drone into an enemy
 - [x] Enemy stats scale with shape (HP, speed, damage, XP value)
 - [x] Spawn rate increases over time
 - [x] Wave composition changes (more complex shapes in late game)
-- [ ] Optional: Boss variants (different color, special behavior)
+- [x] Optional: Boss variants (different color, special behavior)
 
 **Deliverable:** Enemy encounters feel varied and escalate naturally.
 
@@ -62,47 +62,47 @@ A Geometry Wars + Vampire Survivors hybrid where you pilot a drone into an enemy
 **Goal:** Implement all 7 upgrade paths
 
 ### Minigun (refine existing)
-- [ ] Slow down base fire rate (0.4s start?)
-- [ ] Auto-targets nearest enemy
-- [ ] Levels: fire rate + damage increases
+- [x] Slow down base fire rate (0.4s start?)
+- [x] Auto-targets nearest enemy
+- [x] Levels: fire rate + damage increases
 
 ### Rockets
-- [ ] Slower fire (2-3s cooldown)
-- [ ] Aims at mouse position
-- [ ] Splash damage radius on impact
-- [ ] Levels: damage, splash radius, fire rate
+- [x] Slower fire (2-3s cooldown)
+- [x] Aims at mouse position
+- [x] Splash damage radius on impact
+- [x] Levels: damage, splash radius, fire rate
 
 ### Laser
-- [ ] Very slow recharge (5-8s)
-- [ ] Pierces all enemies in line
-- [ ] Aims at mouse
-- [ ] Levels: damage, pierce depth, cooldown reduction
+- [x] Very slow recharge (5-8s)
+- [x] Pierces all enemies in line
+- [x] Aims at mouse
+- [x] Levels: damage, pierce depth, cooldown reduction
 
 ### AoE EMP Field
-- [ ] Constant pulse around player
-- [ ] Damage tick rate (every 0.5s?)
-- [ ] Visual ring/pulse effect
-- [ ] Levels: damage, radius, tick rate
+- [x] Constant pulse around player
+- [x] Damage tick rate (every 0.5s?)
+- [x] Visual ring/pulse effect
+- [x] Levels: damage, radius, tick rate
 
 ### Health Upgrades
-- [ ] Increase max HP (100 → 125 → 150, etc)
-- [ ] Instant heal on pickup
-- [ ] Multi-level (5-6 tiers)
+- [x] Increase max HP (100 → 125 → 150, etc)
+- [x] Instant heal on pickup
+- [x] Multi-level (5-6 tiers)
 
 ### Shield System
-- [ ] Separate shield bar (recharges over time)
-- [ ] Absorbs damage before HP
-- [ ] Ignores collision damage (only blocks projectiles if enemies shoot)
-- [ ] Levels: max shield, regen rate, regen delay
-- [ ] Visual indicator (blue ring around player when active?)
+- [x] Separate shield bar (recharges over time)
+- [x] Absorbs damage before HP
+- [x] Ignores collision damage (only blocks projectiles if enemies shoot)
+- [x] Levels: max shield, regen rate, regen delay
+- [x] Visual indicator (blue ring around player when active?)
 
 ### Tractor Beam (Utility)
-- [ ] Starts at level 0: 0 pickup radius (must collide with XP gems)
-- [ ] Level 1+: Magnetic pull on XP gems within radius
-- [ ] Each level increases pickup radius progressively
-- [ ] Levels: pickup radius expansion (e.g., 0 → 50 → 100 → 150 → 200 → 250 pixels)
-- [ ] Visual indicator: subtle circular pulse when active (level 1+)
-- [ ] Quality of life upgrade that becomes more valuable in chaotic late game
+- [x] Starts at level 0: 0 pickup radius (must collide with XP gems)
+- [x] Level 1+: Magnetic pull on XP gems within radius
+- [x] Each level increases pickup radius progressively
+- [x] Levels: pickup radius expansion (e.g., 0 → 50 → 100 → 150 → 200 → 250 pixels)
+- [x] Visual indicator: subtle circular pulse when active (level 1+)
+- [x] Quality of life upgrade that becomes more valuable in chaotic late game
 
 **Deliverable:** All 7 upgrade paths functional with 5 levels each.
 
@@ -111,12 +111,12 @@ A Geometry Wars + Vampire Survivors hybrid where you pilot a drone into an enemy
 ## PHASE 5: Menus & UX
 **Goal:** Polish the experience
 
-- [ ] Start menu (Title, Start, Options, Quit)
-- [ ] Options: Window size (720p, 1080p, fullscreen toggle)
-- [ ] Intro lore text on Start press
-- [ ] Pause menu (ESC to pause mid-game)
-- [ ] End screen improvements (stats breakdown, retry button)
-- [ ] Level-up UI polish (show current vs next level stats)
+- [x] Start menu (Title, Start, Options, Quit)
+- [x] Options: Window size (720p, 1080p, fullscreen toggle)
+- [x] Intro lore text on Start press
+- [x] Pause menu (ESC to pause mid-game)
+- [x] End screen improvements (stats breakdown, retry button)
+- [x] Level-up UI polish (show current vs next level stats)
 
 **Deliverable:** Game has proper flow from launch to completion.
 
