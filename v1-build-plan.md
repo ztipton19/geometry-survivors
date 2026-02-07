@@ -11,12 +11,12 @@ A Geometry Wars + Vampire Survivors hybrid where you pilot a drone into an enemy
 ## PHASE 1: Core Loop Completion
 **Goal:** Get it playable end-to-end
 
-- [ ] XP gem drops on enemy death (green/cyan colored)
-- [ ] XP collection + level counter
-- [ ] Basic level-up screen (pause, show 3 options, resume)
-- [ ] Upgrade data structure (weapon levels, stats per level)
-- [ ] Apply upgrade logic (increase fire rate, unlock new weapon, etc)
-- [ ] Win condition at 0:00 (basic "Mission Complete" screen with stats)
+- [x] XP gem drops on enemy death (green/cyan colored)
+- [x] XP collection + level counter
+- [x] Basic level-up screen (pause, show 3 options, resume)
+- [x] Upgrade data structure (weapon levels, stats per level)
+- [x] Apply upgrade logic (increase fire rate, unlock new weapon, etc)
+- [x] Win condition at 0:00 (basic "Mission Complete" screen with stats)
 
 **Deliverable:** You can play a full 15min run, level up, get stronger, and see an end screen.
 
@@ -25,14 +25,14 @@ A Geometry Wars + Vampire Survivors hybrid where you pilot a drone into an enemy
 ## PHASE 2: Visual Polish
 **Goal:** Make it feel good
 
-- [ ] Change player to triangle (blue)
-- [ ] Change enemies to red
-- [ ] Infinite scrolling background (grid lines or particle field that wraps)
-- [ ] Enemy spawn off-screen (check player position, spawn outside view radius)
-- [ ] Particle effects on death (both player and enemy)
-- [ ] Enemies fragment/explode instead of vanishing
-- [ ] Muzzle flash / bullet trails
-- [ ] Screen shake on big hits
+- [x] Change player to triangle (blue)
+- [x] Change enemies to red
+- [x] Infinite scrolling background (grid lines or particle field that wraps)
+- [x] Enemy spawn off-screen (check player position, spawn outside view radius)
+- [x] Particle effects on death (both player and enemy)
+- [x] Enemies fragment/explode instead of vanishing
+- [x] Muzzle flash / bullet trails
+- [x] Screen shake on big hits
 
 **Deliverable:** Game feels juicy and satisfying to play.
 
@@ -42,16 +42,16 @@ A Geometry Wars + Vampire Survivors hybrid where you pilot a drone into an enemy
 **Goal:** Progression depth
 
 ### Polygon-based Enemy Scaling
-- [ ] Circle (1) = weakest, fastest
-- [ ] Triangle (3) = medium
-- [ ] Square (4) = tougher
-- [ ] Pentagon (5) = mini-boss tier
-- [ ] Hexagon+ (6-8) = rare heavy units
+- [x] Circle (1) = weakest, fastest
+- [x] Triangle (3) = medium
+- [x] Square (4) = tougher
+- [x] Pentagon (5) = mini-boss tier
+- [x] Hexagon+ (6-8) = rare heavy units
 
 ### Progression
-- [ ] Enemy stats scale with shape (HP, speed, damage, XP value)
-- [ ] Spawn rate increases over time
-- [ ] Wave composition changes (more complex shapes in late game)
+- [x] Enemy stats scale with shape (HP, speed, damage, XP value)
+- [x] Spawn rate increases over time
+- [x] Wave composition changes (more complex shapes in late game)
 - [ ] Optional: Boss variants (different color, special behavior)
 
 **Deliverable:** Enemy encounters feel varied and escalate naturally.
