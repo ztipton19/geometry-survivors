@@ -77,12 +77,12 @@ UPGRADES: dict[str, Upgrade] = {
         category="weapon",
         max_level=5,
         values=[
-            {"fire_cooldown": 0.14, "bullet_damage": 12.0},
-            {"fire_cooldown": 0.13, "bullet_damage": 14.0},
-            {"fire_cooldown": 0.12, "bullet_damage": 16.0},
-            {"fire_cooldown": 0.10, "bullet_damage": 18.0},
-            {"fire_cooldown": 0.08, "bullet_damage": 20.0},
-            {"fire_cooldown": 0.06, "bullet_damage": 22.0},
+            {"fire_cooldown": 0.4, "bullet_damage": 10.0},
+            {"fire_cooldown": 0.35, "bullet_damage": 12.0},
+            {"fire_cooldown": 0.3, "bullet_damage": 14.0},
+            {"fire_cooldown": 0.26, "bullet_damage": 16.0},
+            {"fire_cooldown": 0.22, "bullet_damage": 18.0},
+            {"fire_cooldown": 0.18, "bullet_damage": 20.0},
         ],
     ),
     "rockets": Upgrade(

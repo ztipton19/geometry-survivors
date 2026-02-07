@@ -11,6 +11,7 @@ class Enemy:
     xp_value: int
     sides: int = 1
     radius: float = 12.0
+    is_boss: bool = False
 
     @property
     def pos(self) -> tuple[float, float]:
