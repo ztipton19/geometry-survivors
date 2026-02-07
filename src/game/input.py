@@ -2,8 +2,9 @@
 
 import pygame
 
+from game import settings
 from game.entities.player import Player
-from game.settings import PLAYER_RADIUS, PLAYER_SPEED, WIDTH, HEIGHT
+from game.settings import PLAYER_RADIUS, PLAYER_SPEED
 from game.util import clamp, norm
 
 
@@ -15,5 +16,5 @@ def handle_player_input(player: Player, dt: float) -> None:
 
     player.x += nx * PLAYER_SPEED * dt
     player.y += ny * PLAYER_SPEED * dt
-    player.x = clamp(player.x, PLAYER_RADIUS, WIDTH - PLAYER_RADIUS)
-    player.y = clamp(player.y, PLAYER_RADIUS, HEIGHT - PLAYER_RADIUS)
+    player.x = clamp(player.x, PLAYER_RADIUS, settings.WIDTH - PLAYER_RADIUS)
+    player.y = clamp(player.y, PLAYER_RADIUS, settings.HEIGHT - PLAYER_RADIUS)
