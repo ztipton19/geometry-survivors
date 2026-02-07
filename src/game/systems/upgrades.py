@@ -33,8 +33,8 @@ def generate_upgrade_options(player: Player) -> list[str]:
     # Select 3 random options (or fewer if not enough available)
     num_options = min(3, len(valid_options))
     if num_options == 0:
-        # Fallback to health upgrade if nothing else available
-        return ["health"]
+        # No valid upgrades remain (everything maxed).
+        return []
     
     return random.sample(valid_options, num_options)
 
@@ -45,6 +45,9 @@ def apply_upgrade(player: Player, upgrade_id: str) -> None:
     
     # Get current level
     current_level = getattr(player, f"{upgrade_id}_level", 0)
+    if current_level >= upgrade.max_level:
+        # Already maxed; ignore safely.
+        return
     new_level = current_level + 1 if current_level >= 0 else 0
     
     # Get upgrade values for this level

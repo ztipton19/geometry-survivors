@@ -266,8 +266,12 @@ class Game:
         
         # Level up
         if leveled_up:
-            self.state = "LEVEL_UP"
             self.upgrade_options = upgrades.generate_upgrade_options(self.player)
+            if self.upgrade_options:
+                self.state = "LEVEL_UP"
+            else:
+                # No upgrades remain; continue play without opening level-up UI.
+                self.state = "PLAY"
 
         # Check death
         if self.player.hp <= 0:
