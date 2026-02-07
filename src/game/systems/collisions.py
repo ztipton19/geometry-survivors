@@ -6,7 +6,7 @@ from game.entities.bullet import Bullet
 from game.entities.enemy import Enemy
 from game.entities.player import Player
 from game.entities.xpgem import XPGem
-from game.settings import BULLET_DAMAGE, BULLET_RADIUS, ENEMY_RADIUS, PLAYER_RADIUS
+from game.settings import BULLET_DAMAGE, BULLET_RADIUS, PLAYER_RADIUS
 from game.util import dist2, norm
 
 
@@ -30,7 +30,9 @@ def resolve_bullet_hits(
     """Handle bullet collisions and spawn XP gems for killed enemies."""
     for bullet in bullets:
         for enemy in enemies:
-            if dist2(bullet.x, bullet.y, enemy.x, enemy.y) <= (BULLET_RADIUS + ENEMY_RADIUS) ** 2:
+            if dist2(bullet.x, bullet.y, enemy.x, enemy.y) <= (
+                BULLET_RADIUS + enemy.radius
+            ) ** 2:
                 enemy.hp -= bullet.damage
                 player.damage_dealt += bullet.damage
                 bullet.ttl = 0
@@ -39,9 +41,7 @@ def resolve_bullet_hits(
                 # Spawn XP gem if enemy dies
                 if enemy.hp <= 0:
                     player.enemies_killed += 1
-                    # XP value based on enemy HP (weaker enemies give less)
-                    xp_value = max(5, int(enemy.hp + bullet.damage)) // 3
-                    xpgems.append(XPGem(x=enemy.x, y=enemy.y, value=xp_value))
+                    xpgems.append(XPGem(x=enemy.x, y=enemy.y, value=enemy.xp_value))
                     death_positions.append((enemy.x, enemy.y))
                 
                 break
@@ -53,8 +53,8 @@ def resolve_player_hits(player: Player, enemies: list[Enemy], dt: float) -> floa
     total_damage = 0.0
     
     for enemy in enemies:
-        if dist2(px, py, enemy.x, enemy.y) <= (PLAYER_RADIUS + ENEMY_RADIUS) ** 2:
-            damage = 25 * dt
+        if dist2(px, py, enemy.x, enemy.y) <= (PLAYER_RADIUS + enemy.radius) ** 2:
+            damage = enemy.damage * dt
             total_damage += damage
             
             # Shield absorbs damage first

@@ -18,7 +18,6 @@ from game.input import handle_player_input
 from game.settings import (
     BG,
     BULLET_RADIUS,
-    ENEMY_RADIUS,
     FPS,
     HEIGHT,
     NEON_BLUE,
@@ -188,20 +187,7 @@ class Game:
             )
 
         for enemy in self.enemies:
-            pygame.draw.circle(
-                self.screen,
-                RED,
-                (int(enemy.x + shake_x), int(enemy.y + shake_y)),
-                ENEMY_RADIUS,
-                2,
-            )
-            pygame.draw.circle(
-                self.screen,
-                (60, 0, 0),
-                (int(enemy.x + shake_x), int(enemy.y + shake_y)),
-                ENEMY_RADIUS - 3,
-                0,
-            )
+            self._draw_enemy(enemy, shake_x, shake_y)
 
         px, py = self.player.pos
         triangle = self._get_player_triangle(px + shake_x, py + shake_y)
@@ -390,4 +376,42 @@ class Game:
             (x, y - size),
             (x - size * 0.85, y + size * 0.7),
             (x + size * 0.85, y + size * 0.7),
+        ]
+
+    def _draw_enemy(self, enemy: Enemy, shake_x: float, shake_y: float) -> None:
+        ex = enemy.x + shake_x
+        ey = enemy.y + shake_y
+        if enemy.sides <= 1:
+            pygame.draw.circle(
+                self.screen,
+                RED,
+                (int(ex), int(ey)),
+                int(enemy.radius),
+                2,
+            )
+            pygame.draw.circle(
+                self.screen,
+                (60, 0, 0),
+                (int(ex), int(ey)),
+                max(1, int(enemy.radius - 3)),
+                0,
+            )
+            return
+
+        points = self._get_polygon_points(ex, ey, enemy.radius, enemy.sides)
+        inner_points = self._get_polygon_points(ex, ey, max(1.0, enemy.radius - 3), enemy.sides)
+        pygame.draw.polygon(self.screen, RED, points, 2)
+        pygame.draw.polygon(self.screen, (60, 0, 0), inner_points, 0)
+
+    def _get_polygon_points(
+        self, x: float, y: float, radius: float, sides: int
+    ) -> list[tuple[float, float]]:
+        angle_offset = -math.pi / 2
+        step = math.tau / sides
+        return [
+            (
+                x + math.cos(angle_offset + step * i) * radius,
+                y + math.sin(angle_offset + step * i) * radius,
+            )
+            for i in range(sides)
         ]
