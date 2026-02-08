@@ -6,6 +6,7 @@ from game.entities.player import Player
 from game.settings import (
     HURDLE_COOLDOWN,
     NEON_BLUE,
+    NEON_CYAN,
     NEON_GREEN,
     NEON_MAGENTA,
     NEON_YELLOW,
