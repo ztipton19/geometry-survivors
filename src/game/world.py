@@ -736,16 +736,19 @@ class Game:
 
         # Calculate back of ship position
         size = PLAYER_RADIUS + 4
+        # Backward direction vector (opposite of forward which is (0, -1) rotated)
+        back_dx = -math.sin(angle)
+        back_dy = math.cos(angle)
         back_offset = size * 0.8  # Position at back of ship
-        back_x = px - math.sin(angle) * back_offset
-        back_y = py + math.cos(angle) * back_offset
+        back_x = px + back_dx * back_offset
+        back_y = py + back_dy * back_offset
 
         # Spawn 1-2 particles per frame depending on speed
         particle_count = 1 if random.random() > 0.5 else 2
 
         for _ in range(particle_count):
             # Particles shoot out the back (opposite of ship direction)
-            particle_angle = angle + math.pi + random.uniform(-0.3, 0.3)
+            particle_angle = math.atan2(back_dy, back_dx) + random.uniform(-0.3, 0.3)
             particle_speed = random.uniform(80, 150)
 
             # Color shifts from cyan to white based on speed

@@ -71,12 +71,14 @@ def apply_rotation(body: pymunk.Body, turn_direction: float, dt: float) -> None:
 
 
 def apply_thrust(body: pymunk.Body, power: float) -> None:
-    forward = pymunk.Vec2d(1.0, 0.0).rotated(body.angle)
+    # Ship points up (0, -1) at angle=0, rotated by body.angle
+    forward = pymunk.Vec2d(0.0, -1.0).rotated(body.angle)
     body.apply_force_at_world_point(forward * power, body.position)
 
 
 def apply_strafe(body: pymunk.Body, power: float) -> None:
-    lateral = pymunk.Vec2d(0.0, 1.0).rotated(body.angle)
+    # Lateral is perpendicular to forward (right is 1, 0)
+    lateral = pymunk.Vec2d(1.0, 0.0).rotated(body.angle)
     body.apply_force_at_world_point(lateral * power, body.position)
 
 
@@ -153,7 +155,8 @@ def apply_player_controls(
     if hurdle_cooldown > 0.0:
         hurdle_cooldown = max(0.0, hurdle_cooldown - dt)
     elif hurdle_unlocked and hurdle_direction != 0.0:
-        lateral = pymunk.Vec2d(0.0, 1.0).rotated(body.angle)
+        # Lateral hurdle (right is 1, 0)
+        lateral = pymunk.Vec2d(1.0, 0.0).rotated(body.angle)
         body.velocity += lateral * (HURDLE_IMPULSE * hurdle_direction)
         hurdle_cooldown = HURDLE_COOLDOWN
     setattr(player, "hurdle_cooldown", hurdle_cooldown)
