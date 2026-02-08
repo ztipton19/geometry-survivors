@@ -13,7 +13,7 @@ NEON_ORANGE = (255, 150, 0)
 WHITE = (240, 240, 240)
 RED = (255, 60, 60)
 
-PLAYER_SPEED = 360.0
+PLAYER_SPEED = 468.0  # Increased 30% from 360
 PLAYER_RADIUS = 12
 PLAYER_MAX_HP = 100
 
@@ -21,20 +21,20 @@ PLAYER_MAX_HP = 100
 ROTATION_SPEED = 240  # deg/sec - Fast enough to feel responsive
 ROTATION_ACCEL = 800  # Instant turn start (no sluggishness)
 
-THRUST_POWER = 600  # Strong acceleration
-STRAFE_POWER = 520  # Side thrust for dodging and lane changes
-MAX_SPEED = 450  # Fast but controllable
+THRUST_POWER = 780  # Increased 30% from 600
+STRAFE_POWER = 676  # Increased 30% from 520
+MAX_SPEED = 585  # Increased 30% from 450
 MIN_SPEED = 0  # Can stop completely
 
 FRICTION = 0.92  # Slow natural deceleration
 DRIFT_FACTOR = 0.95  # High momentum carry (ice-like)
 
-REVERSE_POWER = 400  # Slower than forward thrust
+REVERSE_POWER = 520  # Increased 30% from 400
 THROTTLE_STEP_PER_SEC = 0.9
-BOOST_FORCE = 1400
+BOOST_FORCE = 1820  # Increased 30% from 1400
 BOOST_DURATION = 0.28
 BOOST_RECHARGE_TIME = 4.0
-HURDLE_IMPULSE = 280.0
+HURDLE_IMPULSE = 364.0  # Increased 30% from 280
 HURDLE_COOLDOWN = 1.8
 
 BULLET_SPEED = 900.0
@@ -51,7 +51,7 @@ EMP_PULSE_LIFETIME = 0.25
 FIRE_COOLDOWN_START = 0.14
 FIRE_COOLDOWN_MIN = 0.04
 
-ENEMY_BASE_SPEED = 120.0
+ENEMY_BASE_SPEED = 156.0  # Increased 30% from 120
 ENEMY_RADIUS = 12
 ENEMY_SPAWN_INTERVAL_START = 0.75
 ENEMY_SPAWN_INTERVAL_MIN = 0.18
