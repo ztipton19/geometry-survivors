@@ -740,12 +740,12 @@ class Game:
         angle = float(self.player.body.angle)
         px, py = self.player.pos
 
-        # Get velocity to scale particle intensity
-        vx, vy = self.player.body.velocity
-        speed = math.hypot(vx, vy)
+        throttle_level = max(0.0, min(1.0, float(getattr(self.player, "throttle_level", 0.0))))
+        boost_timer = float(getattr(self.player, "boost_timer", 0.0))
+        thrust_ratio = 1.0 if boost_timer > 0.0 else throttle_level
 
-        # Only spawn particles if moving or throttle is applied
-        if speed < 5.0:
+        # Only spawn particles while thrust is applied
+        if thrust_ratio <= 0.0:
             return
 
         # Calculate back of ship position
@@ -757,16 +757,19 @@ class Game:
         back_x = px + back_dx * back_offset
         back_y = py + back_dy * back_offset
 
-        # Spawn 1-2 particles per frame depending on speed
-        particle_count = 1 if random.random() > 0.5 else 2
+        # Spawn 0-2 particles per frame depending on thrust ratio
+        max_particles = 2
+        particle_count = int(thrust_ratio * max_particles)
+        if random.random() < (thrust_ratio * max_particles - particle_count):
+            particle_count += 1
 
         for _ in range(particle_count):
             # Particles shoot out the back (opposite of ship direction)
             particle_angle = math.atan2(back_dy, back_dx) + random.uniform(-0.3, 0.3)
-            particle_speed = random.uniform(80, 150)
+            particle_speed = random.uniform(80, 150) * (0.4 + 0.6 * thrust_ratio)
 
-            # Color shifts from cyan to white based on speed
-            intensity = min(1.0, speed / 300.0)
+            # Color shifts from cyan to white based on thrust
+            intensity = thrust_ratio
             base_color = NEON_CYAN
             color = (
                 int(base_color[0] + (255 - base_color[0]) * intensity * 0.3),
@@ -780,8 +783,8 @@ class Game:
                     y=back_y,
                     vx=math.cos(particle_angle) * particle_speed,
                     vy=math.sin(particle_angle) * particle_speed,
-                    ttl=random.uniform(0.15, 0.35),
-                    radius=random.uniform(1.2, 2.5),
+                    ttl=random.uniform(0.12, 0.3) * (0.6 + 0.4 * thrust_ratio),
+                    radius=random.uniform(1.0, 2.2) * (0.6 + 0.4 * thrust_ratio),
                     color=color,
                 )
             )
