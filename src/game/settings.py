@@ -13,7 +13,7 @@ NEON_ORANGE = (255, 150, 0)
 WHITE = (240, 240, 240)
 RED = (255, 60, 60)
 
-PLAYER_SPEED = 468.0  # Increased 30% from 360
+PLAYER_SPEED = 396.0  # Reduced from 468 for better balance
 PLAYER_RADIUS = 12
 PLAYER_MAX_HP = 100
 
@@ -21,20 +21,20 @@ PLAYER_MAX_HP = 100
 ROTATION_SPEED = 240  # deg/sec - Fast enough to feel responsive
 ROTATION_ACCEL = 800  # Instant turn start (no sluggishness)
 
-THRUST_POWER = 780  # Increased 30% from 600
-STRAFE_POWER = 676  # Increased 30% from 520
-MAX_SPEED = 585  # Increased 30% from 450
+THRUST_POWER = 650  # Balanced speed increase
+STRAFE_POWER = 572  # Balanced speed increase
+MAX_SPEED = 500  # Balanced speed increase
 MIN_SPEED = 0  # Can stop completely
 
 FRICTION = 0.92  # Slow natural deceleration
 DRIFT_FACTOR = 0.95  # High momentum carry (ice-like)
 
-REVERSE_POWER = 520  # Increased 30% from 400
+REVERSE_POWER = 440  # Balanced speed increase
 THROTTLE_STEP_PER_SEC = 0.9
-BOOST_FORCE = 1820  # Increased 30% from 1400
+BOOST_FORCE = 1540  # Balanced speed increase
 BOOST_DURATION = 0.28
 BOOST_RECHARGE_TIME = 4.0
-HURDLE_IMPULSE = 364.0  # Increased 30% from 280
+HURDLE_IMPULSE = 308.0  # Balanced speed increase
 HURDLE_COOLDOWN = 1.8
 
 BULLET_SPEED = 900.0
@@ -51,7 +51,7 @@ EMP_PULSE_LIFETIME = 0.25
 FIRE_COOLDOWN_START = 0.14
 FIRE_COOLDOWN_MIN = 0.04
 
-ENEMY_BASE_SPEED = 156.0  # Increased 30% from 120
+ENEMY_BASE_SPEED = 138.0  # Balanced speed increase
 ENEMY_RADIUS = 12
 ENEMY_SPAWN_INTERVAL_START = 0.75
 ENEMY_SPAWN_INTERVAL_MIN = 0.18
