@@ -22,6 +22,7 @@ ROTATION_SPEED = 240  # deg/sec - Fast enough to feel responsive
 ROTATION_ACCEL = 800  # Instant turn start (no sluggishness)
 
 THRUST_POWER = 600  # Strong acceleration
+STRAFE_POWER = 520  # Side thrust for dodging and lane changes
 MAX_SPEED = 450  # Fast but controllable
 MIN_SPEED = 0  # Can stop completely
 
@@ -29,6 +30,12 @@ FRICTION = 0.92  # Slow natural deceleration
 DRIFT_FACTOR = 0.95  # High momentum carry (ice-like)
 
 REVERSE_POWER = 400  # Slower than forward thrust
+THROTTLE_STEP_PER_SEC = 0.9
+BOOST_FORCE = 1400
+BOOST_DURATION = 0.28
+BOOST_RECHARGE_TIME = 4.0
+HURDLE_IMPULSE = 280.0
+HURDLE_COOLDOWN = 1.8
 
 BULLET_SPEED = 900.0
 BULLET_RADIUS = 3

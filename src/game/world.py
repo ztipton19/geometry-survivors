@@ -34,6 +34,7 @@ from game.settings import (
     FPS,
     LASER_LIFETIME,
     LASER_WIDTH,
+    HURDLE_COOLDOWN,
     NEON_BLUE,
     NEON_CYAN,
     NEON_GREEN,
@@ -479,8 +480,9 @@ class Game:
             self.screen,
             self.font,
             self.player,
-            len(self.enemies),
             self.remaining,
+            self._get_weapon_slots(),
+            self._get_utility_slots(),
         )
         
         # Draw level-up screen if in that state
@@ -754,6 +756,112 @@ class Game:
             ry = px * sin_a + py * cos_a
             rotated.append((x + rx, y + ry))
         return rotated
+
+    def _get_weapon_slots(self) -> list[dict[str, object]]:
+        minigun_cd = self.player.get_fire_cooldown()
+        minigun_ratio = min(1.0, self.fire_timer / max(0.0001, minigun_cd))
+
+        rocket_ratio = 0.0
+        if self.player.rockets_level >= 0:
+            rocket_cd = self.player.get_rocket_stats()["fire_cooldown"]
+            rocket_ratio = min(1.0, self.rocket_timer / max(0.0001, rocket_cd))
+
+        laser_ratio = 0.0
+        if self.player.laser_level >= 0:
+            laser_cd = self.player.get_laser_stats()["fire_cooldown"]
+            laser_ratio = min(1.0, self.laser_timer / max(0.0001, laser_cd))
+
+        emp_ratio = 0.0
+        if self.player.emp_level >= 0:
+            emp_ratio = min(1.0, self.emp_timer / 0.5)
+
+        return [
+            {
+                "label": "MINIGUN",
+                "type_icon": "◎",
+                "cooldown_ratio": minigun_ratio,
+                "icon_color": NEON_YELLOW,
+            },
+            {
+                "label": "ROCKET",
+                "type_icon": "⊕",
+                "cooldown_ratio": rocket_ratio,
+                "icon_color": NEON_ORANGE if self.player.rockets_level >= 0 else (70, 70, 70),
+            },
+            {
+                "label": "LASER",
+                "type_icon": "⊕",
+                "cooldown_ratio": laser_ratio,
+                "icon_color": NEON_CYAN if self.player.laser_level >= 0 else (70, 70, 70),
+            },
+            {
+                "label": "EMP",
+                "type_icon": "◎",
+                "cooldown_ratio": emp_ratio,
+                "icon_color": NEON_MAGENTA if self.player.emp_level >= 0 else (70, 70, 70),
+            },
+            {
+                "label": "FORWARD",
+                "type_icon": "→",
+                "cooldown_ratio": 0.0,
+                "icon_color": (70, 70, 70),
+            },
+            {
+                "label": "LOCKED",
+                "type_icon": "",
+                "cooldown_ratio": 0.0,
+                "icon_color": (70, 70, 70),
+            },
+        ]
+
+    def _get_utility_slots(self) -> list[dict[str, object]]:
+        hurdle_ratio = 1.0
+        if self.player.hurdle_cooldown > 0:
+            hurdle_ratio = max(0.0, 1.0 - (self.player.hurdle_cooldown / max(0.001, HURDLE_COOLDOWN)))
+
+        shield_ratio = 0.0
+        if self.player.shield_max > 0:
+            shield_ratio = max(0.0, min(1.0, self.player.shield_hp / self.player.shield_max))
+
+        return [
+            {
+                "label": "BOOST",
+                "type_icon": "",
+                "cooldown_ratio": self.player.boost_charge,
+                "icon_color": NEON_BLUE,
+            },
+            {
+                "label": "HURDLE",
+                "type_icon": "",
+                "cooldown_ratio": hurdle_ratio,
+                "icon_color": NEON_YELLOW,
+                "remaining_cd": self.player.hurdle_cooldown,
+            },
+            {
+                "label": "SHIELD",
+                "type_icon": "",
+                "cooldown_ratio": shield_ratio,
+                "icon_color": NEON_CYAN if self.player.shield_level >= 0 else (70, 70, 70),
+            },
+            {
+                "label": "TRACTOR",
+                "type_icon": "",
+                "cooldown_ratio": self.player.tractor_level / 5,
+                "icon_color": NEON_GREEN,
+            },
+            {
+                "label": "SPEED",
+                "type_icon": "",
+                "cooldown_ratio": self.player.speed_level / 5,
+                "icon_color": NEON_MAGENTA,
+            },
+            {
+                "label": "LOCKED",
+                "type_icon": "",
+                "cooldown_ratio": 0.0,
+                "icon_color": (70, 70, 70),
+            },
+        ]
 
     def _draw_enemy(
         self, enemy: Enemy, cam_x: float, cam_y: float, shake_x: float, shake_y: float

@@ -34,6 +34,17 @@ class Player:
     max_hp: float = PLAYER_MAX_HP
     bullet_damage: float = 10.0
     fire_cooldown: float = 0.4  # Starting fire rate
+    throttle_level: float = 0.0
+    boost_charge: float = 1.0
+    boost_timer: float = 0.0
+    boost_unlocked: bool = True
+    hurdle_cooldown: float = 0.0
+    hurdle_unlocked: bool = True
+    tap_clock: float = 0.0
+    last_left_tap: float = -10.0
+    last_right_tap: float = -10.0
+    left_was_down: bool = False
+    right_was_down: bool = False
     # Game stats
     enemies_killed: int = 0
     damage_dealt: int = 0

@@ -8,13 +8,19 @@ from typing import Iterable
 import pymunk
 
 from game.settings import (
+    BOOST_DURATION,
+    BOOST_FORCE,
+    BOOST_RECHARGE_TIME,
     DRIFT_FACTOR,
     FRICTION,
+    HURDLE_COOLDOWN,
+    HURDLE_IMPULSE,
     MAX_SPEED,
     MIN_SPEED,
-    REVERSE_POWER,
     ROTATION_ACCEL,
     ROTATION_SPEED,
+    STRAFE_POWER,
+    THROTTLE_STEP_PER_SEC,
     THRUST_POWER,
     PLAYER_SPEED,
 )
@@ -69,6 +75,11 @@ def apply_thrust(body: pymunk.Body, power: float) -> None:
     body.apply_force_at_world_point(forward * power, body.position)
 
 
+def apply_strafe(body: pymunk.Body, power: float) -> None:
+    lateral = pymunk.Vec2d(0.0, 1.0).rotated(body.angle)
+    body.apply_force_at_world_point(lateral * power, body.position)
+
+
 def clamp_speed(body: pymunk.Body, max_speed: float, min_speed: float = MIN_SPEED) -> None:
     speed = body.velocity.length
     if speed == 0:
@@ -93,22 +104,59 @@ def step_space(space: pymunk.Space, dt: float) -> None:
 
 def apply_player_controls(
     player: object,
-    turn_direction: float,
-    thrust: bool,
-    reverse: bool,
+    rotate_direction: float,
+    strafe_direction: float,
+    throttle_up: bool,
+    throttle_down: bool,
+    boost_pressed: bool,
+    hurdle_direction: float,
     dt: float,
 ) -> None:
     body = getattr(player, "body", None)
     if body is None:
         return
-    apply_rotation(body, turn_direction, dt)
+    apply_rotation(body, rotate_direction, dt)
     speed_multiplier = 1.0
     if hasattr(player, "get_speed"):
         speed_multiplier = float(player.get_speed()) / PLAYER_SPEED
-    if thrust:
-        apply_thrust(body, THRUST_POWER * speed_multiplier)
-    elif reverse:
-        apply_thrust(body, -REVERSE_POWER * speed_multiplier)
+
+    throttle_level = float(getattr(player, "throttle_level", 0.0))
+    if throttle_up:
+        throttle_level += THROTTLE_STEP_PER_SEC * dt
+    if throttle_down:
+        throttle_level -= THROTTLE_STEP_PER_SEC * dt
+    throttle_level = max(0.0, min(1.0, throttle_level))
+    setattr(player, "throttle_level", throttle_level)
+
+    if throttle_level > 0:
+        apply_thrust(body, THRUST_POWER * speed_multiplier * throttle_level)
+
+    if strafe_direction != 0:
+        apply_strafe(body, STRAFE_POWER * speed_multiplier * strafe_direction)
+
+    boost_charge = float(getattr(player, "boost_charge", 0.0))
+    boost_timer = float(getattr(player, "boost_timer", 0.0))
+    boost_unlocked = bool(getattr(player, "boost_unlocked", False))
+    if boost_unlocked and boost_pressed and boost_charge >= 1.0 and boost_timer <= 0.0:
+        boost_timer = BOOST_DURATION
+        boost_charge = 0.0
+    if boost_timer > 0.0:
+        apply_thrust(body, BOOST_FORCE * speed_multiplier)
+        boost_timer = max(0.0, boost_timer - dt)
+    else:
+        boost_charge = min(1.0, boost_charge + dt / BOOST_RECHARGE_TIME)
+    setattr(player, "boost_timer", boost_timer)
+    setattr(player, "boost_charge", boost_charge)
+
+    hurdle_unlocked = bool(getattr(player, "hurdle_unlocked", False))
+    hurdle_cooldown = float(getattr(player, "hurdle_cooldown", 0.0))
+    if hurdle_cooldown > 0.0:
+        hurdle_cooldown = max(0.0, hurdle_cooldown - dt)
+    elif hurdle_unlocked and hurdle_direction != 0.0:
+        lateral = pymunk.Vec2d(0.0, 1.0).rotated(body.angle)
+        body.velocity += lateral * (HURDLE_IMPULSE * hurdle_direction)
+        hurdle_cooldown = HURDLE_COOLDOWN
+    setattr(player, "hurdle_cooldown", hurdle_cooldown)
 
 
 def update_enemy_ai(enemies: Iterable[object], player_pos: tuple[float, float], dt: float) -> None:
