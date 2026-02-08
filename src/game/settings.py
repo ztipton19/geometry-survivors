@@ -17,6 +17,19 @@ PLAYER_SPEED = 360.0
 PLAYER_RADIUS = 12
 PLAYER_MAX_HP = 100
 
+# Ship physics tuning (shared for player/enemies for now)
+ROTATION_SPEED = 240  # deg/sec - Fast enough to feel responsive
+ROTATION_ACCEL = 800  # Instant turn start (no sluggishness)
+
+THRUST_POWER = 600  # Strong acceleration
+MAX_SPEED = 450  # Fast but controllable
+MIN_SPEED = 0  # Can stop completely
+
+FRICTION = 0.92  # Slow natural deceleration
+DRIFT_FACTOR = 0.95  # High momentum carry (ice-like)
+
+REVERSE_POWER = 400  # Slower than forward thrust
+
 BULLET_SPEED = 900.0
 BULLET_RADIUS = 3
 BULLET_DAMAGE = 12

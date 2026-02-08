@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from game.settings import PLAYER_MAX_HP, PLAYER_SPEED, XP_BASE, XP_GROWTH, XP_LINEAR_BONUS
 from game.upgrades import UPGRADES
+
+if TYPE_CHECKING:
+    import pymunk
 
 
 @dataclass
@@ -32,6 +38,8 @@ class Player:
     enemies_killed: int = 0
     damage_dealt: int = 0
     upgrades_collected: int = 0
+    body: pymunk.Body | None = None
+    shape: pymunk.Shape | None = None
 
     def __post_init__(self) -> None:
         if self.shield_level >= 0:
