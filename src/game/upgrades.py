@@ -64,6 +64,10 @@ class Upgrade:
             if radius <= 0:
                 return "Tractor Beam: Manual pickup only"
             return f"Tractor Beam: {radius}px pickup radius"
+
+        elif self.id == "speed":
+            speed = int(self.values[level]["speed"])
+            return f"Thrusters: {speed} movement speed"
         
         return self.description
 
@@ -179,6 +183,21 @@ UPGRADES: dict[str, Upgrade] = {
             {"pickup_radius": 250},
         ],
     ),
+    "speed": Upgrade(
+        id="speed",
+        name="Thruster Tuning",
+        description="Increase drone movement speed",
+        category="utility",
+        max_level=5,
+        values=[
+            {"speed": 360.0},
+            {"speed": 390.0},
+            {"speed": 420.0},
+            {"speed": 450.0},
+            {"speed": 480.0},
+            {"speed": 510.0},
+        ],
+    ),
 }
 
 
@@ -191,6 +210,9 @@ def get_available_upgrades(player_level: int, unlocked_weapons: set[str]) -> lis
     
     # Always offer health upgrades
     available.append("health")
+
+    # Always offer shield upgrades
+    available.append("shield")
     
     # Offer unlockable weapons based on player level
     if player_level >= 3 and "rockets" not in unlocked_weapons:
@@ -199,10 +221,10 @@ def get_available_upgrades(player_level: int, unlocked_weapons: set[str]) -> lis
         available.append("laser")
     if player_level >= 7 and "emp" not in unlocked_weapons:
         available.append("emp")
-    if player_level >= 9 and "shield" not in unlocked_weapons:
-        available.append("shield")
-    
     # Tractor beam upgrades are always available
     available.append("tractor")
+
+    # Thruster upgrades are always available
+    available.append("speed")
     
     return available
