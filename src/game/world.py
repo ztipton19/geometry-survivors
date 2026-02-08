@@ -18,6 +18,15 @@ from game.entities.player import Player
 from game.entities.rocket import Rocket
 from game.entities.xpgem import XPGem
 from game.input import handle_player_input
+from game.physics import (
+    attach_body,
+    clamp_entity_speeds,
+    create_space,
+    remove_body,
+    step_space,
+    sync_entity_positions,
+    update_enemy_ai,
+)
 from game.settings import (
     BG,
     BULLET_RADIUS,
@@ -63,6 +72,8 @@ class Game:
         self.font, self.big_font = assets.load_fonts()
 
         self.player = Player(settings.WIDTH / 2, settings.HEIGHT / 2)
+        self.space = create_space()
+        attach_body(self.space, self.player, PLAYER_RADIUS)
         self.enemies: list[Enemy] = []
         self.bullets: list[Bullet] = []
         self.rockets: list[Rocket] = []
@@ -93,6 +104,8 @@ class Game:
 
     def restart(self) -> None:
         self.player = Player(settings.WIDTH / 2, settings.HEIGHT / 2)
+        self.space = create_space()
+        attach_body(self.space, self.player, PLAYER_RADIUS)
         self.enemies.clear()
         self.bullets.clear()
         self.rockets.clear()
@@ -129,6 +142,13 @@ class Game:
         handle_player_input(self.player, dt)
 
         self.spawner.update(dt, self.elapsed, self.enemies, self.player.pos)
+        for enemy in self.enemies:
+            attach_body(self.space, enemy, enemy.radius)
+        update_enemy_ai(self.enemies, self.player.pos, dt)
+        step_space(self.space, dt)
+        clamp_entity_speeds(self.player, self.enemies)
+        sync_entity_positions([self.player])
+        sync_entity_positions(self.enemies)
 
         death_positions: list[tuple[float, float]] = []
         hit_positions: list[tuple[float, float]] = []
@@ -222,7 +242,6 @@ class Game:
         ]
         self.lasers = [laser for laser in self.lasers if laser.ttl > 0]
 
-        collisions.update_enemy_positions(self.enemies, self.player, dt)
         collisions.resolve_bullet_hits(
             self.bullets,
             self.enemies,
@@ -239,7 +258,13 @@ class Game:
             death_positions,
             hit_positions,
         )
-        self.enemies = [enemy for enemy in self.enemies if enemy.hp > 0]
+        alive_enemies: list[Enemy] = []
+        for enemy in self.enemies:
+            if enemy.hp > 0:
+                alive_enemies.append(enemy)
+            else:
+                remove_body(self.space, enemy)
+        self.enemies = alive_enemies
         total_damage = collisions.resolve_player_hits(self.player, self.enemies, dt)
         if total_damage > 0:
             self._add_screen_shake(min(6.0, 2.0 + total_damage * 1.5))
@@ -420,7 +445,10 @@ class Game:
 
         px, py = self.player.pos
         screen_px, screen_py = self._world_to_screen(px, py, cam_x, cam_y, shake_x, shake_y)
-        triangle = self._get_player_triangle(screen_px, screen_py)
+        angle = 0.0
+        if self.player.body is not None:
+            angle = float(self.player.body.angle)
+        triangle = self._get_player_triangle(screen_px, screen_py, angle)
         pygame.draw.polygon(self.screen, (20, 40, 80), triangle, 0)
         pygame.draw.polygon(self.screen, NEON_BLUE, triangle, 2)
         
@@ -711,13 +739,21 @@ class Game:
                 1,
             )
 
-    def _get_player_triangle(self, x: float, y: float) -> list[tuple[float, float]]:
+    def _get_player_triangle(self, x: float, y: float, angle: float) -> list[tuple[float, float]]:
         size = PLAYER_RADIUS + 4
-        return [
-            (x, y - size),
-            (x - size * 0.85, y + size * 0.7),
-            (x + size * 0.85, y + size * 0.7),
+        points = [
+            (0.0, -size),
+            (-size * 0.85, size * 0.7),
+            (size * 0.85, size * 0.7),
         ]
+        sin_a = math.sin(angle)
+        cos_a = math.cos(angle)
+        rotated = []
+        for px, py in points:
+            rx = px * cos_a - py * sin_a
+            ry = px * sin_a + py * cos_a
+            rotated.append((x + rx, y + ry))
+        return rotated
 
     def _draw_enemy(
         self, enemy: Enemy, cam_x: float, cam_y: float, shake_x: float, shake_y: float
