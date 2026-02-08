@@ -124,10 +124,9 @@ def apply_player_controls(
 
     throttle_level = float(getattr(player, "throttle_level", 0.0))
     if throttle_up:
-        throttle_level += THROTTLE_STEP_PER_SEC * dt
+        throttle_level = 1.0  # Instant max thrust
     if throttle_down:
-        throttle_level -= THROTTLE_STEP_PER_SEC * dt
-    throttle_level = max(0.0, min(1.0, throttle_level))
+        throttle_level = 0.0  # Instant zero thrust
     setattr(player, "throttle_level", throttle_level)
 
     if throttle_level > 0:
