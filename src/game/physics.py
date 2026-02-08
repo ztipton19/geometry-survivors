@@ -109,8 +109,10 @@ def apply_player_controls(
     player: object,
     rotate_direction: float,
     strafe_direction: float,
-    throttle_up: bool,
-    throttle_down: bool,
+    throttle_increment: bool,
+    throttle_decrement: bool,
+    max_thrust: bool,
+    cut_engines: bool,
     boost_pressed: bool,
     hurdle_direction: float,
     dt: float,
@@ -124,10 +126,18 @@ def apply_player_controls(
         speed_multiplier = float(player.get_speed()) / PLAYER_SPEED
 
     throttle_level = float(getattr(player, "throttle_level", 0.0))
-    if throttle_up:
-        throttle_level = 1.0  # Instant max thrust
-    if throttle_down:
-        throttle_level = 0.0  # Instant zero thrust
+
+    # Instant overrides
+    if max_thrust:
+        throttle_level = 1.0
+    elif cut_engines:
+        throttle_level = 0.0
+    # Incremental adjustments
+    elif throttle_increment:
+        throttle_level = min(1.0, throttle_level + THROTTLE_STEP_PER_SEC * dt)
+    elif throttle_decrement:
+        throttle_level = max(0.0, throttle_level - THROTTLE_STEP_PER_SEC * dt)
+
     setattr(player, "throttle_level", throttle_level)
 
     if throttle_level > 0:

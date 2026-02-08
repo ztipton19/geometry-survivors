@@ -12,8 +12,15 @@ def handle_player_input(player: Player, dt: float) -> None:
         (keys[pygame.K_e] or keys[pygame.K_RIGHT]) - (keys[pygame.K_q] or keys[pygame.K_LEFT])
     )
     strafe = float((keys[pygame.K_d]) - (keys[pygame.K_a]))
-    throttle_up = bool(keys[pygame.K_w] or keys[pygame.K_UP])
-    throttle_down = bool(keys[pygame.K_s] or keys[pygame.K_DOWN])
+
+    # Incremental throttle control
+    throttle_increment = bool(keys[pygame.K_w] or keys[pygame.K_UP])
+    throttle_decrement = bool(keys[pygame.K_s] or keys[pygame.K_DOWN])
+
+    # Instant throttle override
+    max_thrust = bool(keys[pygame.K_LSHIFT])
+    cut_engines = bool(keys[pygame.K_LCTRL])
+
     boost_pressed = bool(keys[pygame.K_SPACE])
 
     player.tap_clock += dt
@@ -36,8 +43,10 @@ def handle_player_input(player: Player, dt: float) -> None:
         player,
         rotate,
         strafe,
-        throttle_up,
-        throttle_down,
+        throttle_increment,
+        throttle_decrement,
+        max_thrust,
+        cut_engines,
         boost_pressed,
         hurdle_direction,
         dt,
