@@ -1,6 +1,6 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from game.settings import PLAYER_MAX_HP, XP_BASE, XP_GROWTH, XP_LINEAR_BONUS
+from game.settings import PLAYER_MAX_HP, PLAYER_SPEED, XP_BASE, XP_GROWTH, XP_LINEAR_BONUS
 from game.upgrades import UPGRADES
 
 
@@ -18,11 +18,12 @@ class Player:
     laser_level: int = -1
     emp_level: int = -1
     health_level: int = 0
-    shield_level: int = -1
+    shield_level: int = 0
     shield_hp: float = 0.0
     shield_max: float = 50.0
     shield_regen_delay: float = 0.0
     tractor_level: int = 0
+    speed_level: int = 0
     # Stats
     max_hp: float = PLAYER_MAX_HP
     bullet_damage: float = 10.0
@@ -31,6 +32,11 @@ class Player:
     enemies_killed: int = 0
     damage_dealt: int = 0
     upgrades_collected: int = 0
+
+    def __post_init__(self) -> None:
+        if self.shield_level >= 0:
+            self.shield_max = self.get_shield_max()
+            self.shield_hp = self.shield_max
 
     @property
     def pos(self) -> tuple[float, float]:
@@ -67,6 +73,10 @@ class Player:
             return 0.0
         values = UPGRADES["shield"].values[self.shield_level]
         return float(values["regen_delay"])
+
+    def get_speed(self) -> float:
+        values = UPGRADES["speed"].values[self.speed_level]
+        return float(values.get("speed", PLAYER_SPEED))
 
     def get_fire_cooldown(self) -> float:
         values = UPGRADES["minigun"].values[self.minigun_level]

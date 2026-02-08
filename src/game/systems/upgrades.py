@@ -77,5 +77,7 @@ def apply_upgrade(player: Player, upgrade_id: str) -> None:
             player.shield_hp = min(player.shield_hp, player.get_shield_max())
     elif upgrade_id == "tractor":
         player.tractor_level = new_level
+    elif upgrade_id == "speed":
+        player.speed_level = new_level
     
     player.upgrades_collected += 1
