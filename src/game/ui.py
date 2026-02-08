@@ -25,34 +25,42 @@ def draw_hud(
     utility_slots: list[dict[str, object]],
 ) -> None:
     width, height = screen.get_size()
-    hud_color = (0, 212, 255)
-    alpha = 166  # ~65%
-    text_color = (220, 245, 255)
+    # Dimmer single color at 50% opacity
+    hud_color = (60, 120, 140)  # Dimmed cyan
+    alpha = 128  # 50%
+    text_color = (120, 160, 180)  # Dimmed text
 
+    # Top bar - timer center, XP left, kills right (simple text)
     mm = int(remaining) // 60
     ss = int(remaining) % 60
     timer_text = f"{mm:02d}:{ss:02d}"
-    draw_xp_bar(screen, font, player, 16, 16, width=260, color=hud_color, alpha=alpha)
 
-    time_font = pygame.font.SysFont("consolas", 40)
+    time_font = pygame.font.SysFont("consolas", 36)
     time_surf = time_font.render(timer_text, True, text_color)
-    screen.blit(time_surf, (width // 2 - time_surf.get_width() // 2, 10))
+    screen.blit(time_surf, (width // 2 - time_surf.get_width() // 2, 12))
 
-    kill_surf = font.render(f"KILLS {player.enemies_killed:04d}", True, text_color)
-    screen.blit(kill_surf, (width - kill_surf.get_width() - 16, 20))
+    xp_surf = font.render(f"LVL {player.level}", True, text_color)
+    screen.blit(xp_surf, (16, 16))
 
-    weapon_rect = pygame.Rect(16, height - 178, 252, 162)
-    utility_rect = pygame.Rect(width - 268, height - 178, 252, 162)
-    center_width = max(320, width - weapon_rect.width - utility_rect.width - 80)
-    center_rect = pygame.Rect((width - center_width) // 2, height - 178, center_width, 162)
+    kill_surf = font.render(f"{player.enemies_killed}", True, text_color)
+    screen.blit(kill_surf, (width - kill_surf.get_width() - 16, 16))
 
-    _draw_panel(screen, weapon_rect, hud_color, alpha)
-    _draw_panel(screen, center_rect, hud_color, alpha)
-    _draw_panel(screen, utility_rect, hud_color, alpha)
+    # Bottom center - minimalist bars and minimap circle
+    center_x = width // 2
+    center_y = height - 50
 
-    _draw_slot_grid(screen, font, weapon_rect, weapon_slots, text_color)
-    _draw_slot_grid(screen, font, utility_rect, utility_slots, text_color)
+    # Minimap circle (placeholder)
+    minimap_radius = 30
+    minimap_surface = pygame.Surface((minimap_radius * 2, minimap_radius * 2), pygame.SRCALPHA)
+    pygame.draw.circle(minimap_surface, (*hud_color, alpha), (minimap_radius, minimap_radius), minimap_radius, 1)
+    screen.blit(minimap_surface, (center_x - minimap_radius, center_y - minimap_radius))
 
+    # Vertical bar dimensions
+    bar_width = 8
+    bar_height = 50
+    bar_gap = 10  # Gap between bars
+
+    # Calculate ratios
     boost_ratio = max(0.0, min(1.0, float(player.boost_charge)))
     throttle_ratio = max(0.0, min(1.0, float(player.throttle_level)))
     hp_ratio = max(0.0, min(1.0, player.hp / max(1.0, player.max_hp)))
@@ -60,42 +68,37 @@ def draw_hud(
     if player.shield_max > 0:
         shield_ratio = max(0.0, min(1.0, player.shield_hp / player.shield_max))
 
-    center_x = center_rect.x + 14
-    center_w = center_rect.width - 28
-    _draw_progress_bar(screen, font, "BOOST", boost_ratio, center_x, center_rect.y + 16, center_w, NEON_BLUE)
-    _draw_progress_bar(
-        screen,
-        font,
-        f"THROTTLE {int(throttle_ratio * 100):3d}%",
-        throttle_ratio,
-        center_x,
-        center_rect.y + 46,
-        center_w,
-        NEON_YELLOW,
-    )
-    _draw_progress_bar(screen, font, "HP", hp_ratio, center_x, center_rect.y + 98, center_w, NEON_GREEN)
-    _draw_progress_bar(
-        screen,
-        font,
-        "SHIELD",
-        shield_ratio,
-        center_x,
-        center_rect.y + 128,
-        center_w,
-        NEON_BLUE,
-    )
+    # Left side: Boost and Throttle
+    boost_x = center_x - minimap_radius - bar_gap - bar_width * 2 - bar_gap
+    throttle_x = center_x - minimap_radius - bar_gap - bar_width
 
-    minimap_rect = pygame.Rect(center_rect.centerx - 56, center_rect.y + 66, 112, 26)
-    pygame.draw.rect(screen, (18, 30, 38), minimap_rect, 0, 4)
-    pygame.draw.rect(screen, hud_color, minimap_rect, 1, 4)
-    minimap_text = pygame.font.SysFont("consolas", 12).render("MINI MAP TBD", True, text_color)
-    screen.blit(
-        minimap_text,
-        (
-            minimap_rect.centerx - minimap_text.get_width() // 2,
-            minimap_rect.centery - minimap_text.get_height() // 2,
-        ),
-    )
+    _draw_vertical_bar(screen, "B", boost_ratio, boost_x, center_y - bar_height // 2, bar_width, bar_height, hud_color, alpha, text_color)
+    _draw_vertical_bar(screen, "T", throttle_ratio, throttle_x, center_y - bar_height // 2, bar_width, bar_height, hud_color, alpha, text_color)
+
+    # Right side: Health and Shield
+    hp_x = center_x + minimap_radius + bar_gap
+    shield_x = center_x + minimap_radius + bar_gap + bar_width + bar_gap
+
+    _draw_vertical_bar(screen, "H", hp_ratio, hp_x, center_y - bar_height // 2, bar_width, bar_height, hud_color, alpha, text_color)
+    _draw_vertical_bar(screen, "S", shield_ratio, shield_x, center_y - bar_height // 2, bar_width, bar_height, hud_color, alpha, text_color)
+
+    # Bottom left: 6 weapon slots (simple squares)
+    slot_size = 24
+    slot_gap = 6
+    weapon_start_x = 16
+    weapon_y = height - slot_size - 16
+
+    for i, slot in enumerate(weapon_slots[:6]):
+        slot_x = weapon_start_x + i * (slot_size + slot_gap)
+        _draw_simple_slot(screen, slot_x, weapon_y, slot_size, slot, hud_color, alpha)
+
+    # Bottom right: 6 utility slots (simple squares)
+    utility_end_x = width - 16
+    utility_y = height - slot_size - 16
+
+    for i, slot in enumerate(utility_slots[:6]):
+        slot_x = utility_end_x - (6 - i) * (slot_size + slot_gap)
+        _draw_simple_slot(screen, slot_x, utility_y, slot_size, slot, hud_color, alpha)
 
 
 def draw_xp_bar(
@@ -141,6 +144,60 @@ def _draw_panel(
     panel.fill((10, 20, 28, alpha))
     screen.blit(panel, rect.topleft)
     pygame.draw.rect(screen, color, rect, 1, 8)
+
+
+def _draw_simple_slot(
+    screen: pygame.Surface,
+    x: int,
+    y: int,
+    size: int,
+    slot: dict[str, object],
+    color: tuple[int, int, int],
+    alpha: int,
+) -> None:
+    """Draw a simple minimalist slot square."""
+    slot_surface = pygame.Surface((size, size), pygame.SRCALPHA)
+
+    # Draw outline
+    pygame.draw.rect(slot_surface, (*color, alpha), (0, 0, size, size), 1)
+
+    # Fill if active/unlocked (icon_color is present and not gray)
+    icon_color = slot.get("icon_color", (80, 80, 80))
+    if icon_color != (70, 70, 70) and icon_color != (80, 80, 80):  # Active slot
+        # Slight fill to show it's active
+        pygame.draw.rect(slot_surface, (*color, alpha // 2), (2, 2, size - 4, size - 4), 0)
+
+    screen.blit(slot_surface, (x, y))
+
+
+def _draw_vertical_bar(
+    screen: pygame.Surface,
+    label: str,
+    ratio: float,
+    x: int,
+    y: int,
+    width: int,
+    height: int,
+    color: tuple[int, int, int],
+    alpha: int,
+    text_color: tuple[int, int, int],
+) -> None:
+    """Draw a minimalist vertical bar with single letter label."""
+    # Draw bar outline
+    bar_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+    pygame.draw.rect(bar_surface, (*color, alpha), (0, 0, width, height), 1)
+
+    # Draw fill from bottom up
+    fill_height = int(height * max(0.0, min(1.0, ratio)))
+    if fill_height > 0:
+        pygame.draw.rect(bar_surface, (*color, alpha), (1, height - fill_height, width - 2, fill_height), 0)
+
+    screen.blit(bar_surface, (x, y))
+
+    # Draw label above bar
+    label_font = pygame.font.SysFont("consolas", 12)
+    label_surf = label_font.render(label, True, text_color)
+    screen.blit(label_surf, (x + width // 2 - label_surf.get_width() // 2, y - 14))
 
 
 def _draw_progress_bar(
