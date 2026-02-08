@@ -42,7 +42,8 @@ from game.settings import (
     NEON_ORANGE,
     NEON_YELLOW,
     PLAYER_RADIUS,
-    RED,
+    WHITE,
+    get_ship_selection_colors,
 )
 from game.systems import collisions, combat, progression, spawner, upgrades, xp
 from game.ui import (
@@ -462,14 +463,15 @@ class Game:
         if self.player.body is not None:
             angle = float(self.player.body.angle)
         triangle = self._get_player_triangle(screen_px, screen_py, angle)
-        pygame.draw.polygon(self.screen, (20, 40, 80), triangle, 0)
-        pygame.draw.polygon(self.screen, NEON_BLUE, triangle, 2)
+        ship_colors = get_ship_selection_colors()
+        pygame.draw.polygon(self.screen, ship_colors["ship_fill"], triangle, 0)
+        pygame.draw.polygon(self.screen, ship_colors["ship_outline"], triangle, 2)
 
         # Draw bright front tip glow for directionality
         # Front tip is the first point in the triangle
         front_x, front_y = triangle[0]
-        pygame.draw.circle(self.screen, (255, 255, 255), (int(front_x), int(front_y)), 3, 0)
-        pygame.draw.circle(self.screen, NEON_CYAN, (int(front_x), int(front_y)), 5, 1)
+        pygame.draw.circle(self.screen, ship_colors["ship_tip"], (int(front_x), int(front_y)), 3, 0)
+        pygame.draw.circle(self.screen, ship_colors["ship_tip"], (int(front_x), int(front_y)), 5, 1)
         
         # Draw shield if active
         if self.player.shield_level >= 0 and self.player.shield_hp > 0:
@@ -1170,8 +1172,8 @@ class Game:
         self, enemy: Enemy, cam_x: float, cam_y: float, shake_x: float, shake_y: float
     ) -> None:
         ex, ey = self._world_to_screen(enemy.x, enemy.y, cam_x, cam_y, shake_x, shake_y)
-        outline_color = NEON_MAGENTA if enemy.is_boss else RED
-        fill_color = (80, 0, 80) if enemy.is_boss else (60, 0, 0)
+        outline_color = NEON_MAGENTA if enemy.is_boss else WHITE
+        fill_color = (80, 0, 80) if enemy.is_boss else (180, 180, 180)
 
         if enemy.sides <= 1:
             pygame.draw.circle(
