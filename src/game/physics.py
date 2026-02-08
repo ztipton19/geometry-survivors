@@ -29,7 +29,7 @@ from game.settings import (
 def create_space() -> pymunk.Space:
     space = pymunk.Space()
     space.gravity = (0.0, 0.0)
-    space.damping = FRICTION
+    space.damping = 1.0  # No damping - true Newtonian physics
     return space
 
 
@@ -93,7 +93,8 @@ def clamp_speed(body: pymunk.Body, max_speed: float, min_speed: float = MIN_SPEE
 
 
 def apply_drift(body: pymunk.Body) -> None:
-    body.velocity *= DRIFT_FACTOR
+    # Only dampen angular velocity for controllable rotation
+    # Linear velocity is unaffected - true Newtonian space physics
     body.angular_velocity *= DRIFT_FACTOR
 
 
