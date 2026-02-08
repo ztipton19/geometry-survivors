@@ -12,6 +12,7 @@ from game.settings import (
     NEON_YELLOW,
     RED,
     WHITE,
+    get_ship_selection_colors,
 )
 from game.upgrades import UPGRADES
 
@@ -26,9 +27,10 @@ def draw_hud(
 ) -> None:
     width, height = screen.get_size()
     # Dimmer single color at 50% opacity
-    hud_color = (60, 120, 140)  # Dimmed cyan
+    palette = get_ship_selection_colors()
+    hud_color = palette["ui_primary"]
     alpha = 128  # 50%
-    text_color = (120, 160, 180)  # Dimmed text
+    text_color = palette["ui_text"]
 
     # Top bar - timer center, XP left, kills right (simple text)
     mm = int(remaining) // 60
@@ -108,10 +110,12 @@ def draw_xp_bar(
     x: int,
     y: int,
     width: int = 200,
-    color: tuple[int, int, int] = (0, 212, 255),
+    color: tuple[int, int, int] | None = None,
     alpha: int = 166,
 ) -> None:
     """Draw XP progress bar."""
+    if color is None:
+        color = get_ship_selection_colors()["xp_bar"]
     bar_height = 24
     bg_surface = pygame.Surface((width, bar_height), pygame.SRCALPHA)
     bg_surface.fill((14, 24, 34, alpha))

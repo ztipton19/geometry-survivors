@@ -13,6 +13,18 @@ NEON_ORANGE = (255, 150, 0)
 WHITE = (240, 240, 240)
 RED = (255, 60, 60)
 
+
+def get_ship_selection_colors() -> dict[str, tuple[int, int, int]]:
+    """Return the active ship/UI palette (placeholder until ship selection exists)."""
+    return {
+        "ship_fill": (140, 120, 0),
+        "ship_outline": NEON_YELLOW,
+        "ship_tip": NEON_YELLOW,
+        "ui_primary": (140, 120, 0),
+        "ui_text": (220, 200, 60),
+        "xp_bar": NEON_YELLOW,
+    }
+
 PLAYER_SPEED = 396.0  # Reduced from 468 for better balance
 PLAYER_RADIUS = 12
 PLAYER_MAX_HP = 100
