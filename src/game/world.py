@@ -98,6 +98,15 @@ class Game:
         self.menu_selection = 0
         self.options_selection = 0
         self.pause_selection = 0
+
+        self.background_seed = 1337
+        self.star_chunk_size = 500
+        self.nebula_chunk_size = 2000
+        self.star_chunks: dict[tuple[int, int], list[dict[str, object]]] = {}
+        self.nebula_chunks: dict[tuple[int, int], list[dict[str, object]]] = {}
+        self.shooting_stars: list[dict[str, float]] = []
+        self.vignette_surface: pygame.Surface | None = None
+        self.vignette_size: tuple[int, int] | None = None
         
         # Upgrade system
         self.upgrade_options: list[str] = []
@@ -120,6 +129,7 @@ class Game:
         self.emp_timer = 0.0
         self.shake_timer = 0.0
         self.shake_strength = 0.0
+        self.shooting_stars.clear()
         self.spawner.reset()
         self.elapsed, self.remaining = progression.reset_timer()
         self.state = "PLAY"
@@ -320,6 +330,7 @@ class Game:
         self.emp_pulses = [pulse for pulse in self.emp_pulses if pulse.ttl > 0]
         if self.shake_timer > 0:
             self.shake_timer = max(0.0, self.shake_timer - dt)
+        self._update_shooting_stars(dt)
 
     def draw(self) -> None:
         if self.state in ("PLAY", "LEVEL_UP", "PAUSE", "WIN", "LOSE"):
@@ -482,6 +493,7 @@ class Game:
             )
 
         self._draw_particles(cam_x, cam_y, shake_x, shake_y)
+        self._draw_vignette()
 
         draw_hud(
             self.screen,
@@ -775,6 +787,7 @@ class Game:
     def _draw_background(
         self, cam_x: float, cam_y: float, shake_x: float, shake_y: float
     ) -> None:
+        self._draw_nebulae(cam_x, cam_y, shake_x, shake_y)
         spacing = 60
         grid_color = (12, 12, 24)
         width, height = self.screen.get_size()
@@ -801,6 +814,234 @@ class Game:
                 (int(width + shake_x), ypos),
                 1,
             )
+        self._draw_stars(cam_x, cam_y, shake_x, shake_y)
+        self._draw_shooting_stars(cam_x, cam_y, shake_x, shake_y)
+
+    def _get_star_chunk(self, chunk_x: int, chunk_y: int) -> list[dict[str, object]]:
+        key = (chunk_x, chunk_y)
+        if key in self.star_chunks:
+            return self.star_chunks[key]
+
+        seed = (
+            self.background_seed
+            + chunk_x * 92837111
+            + chunk_y * 689287499
+        ) & 0xFFFFFFFF
+        rng = random.Random(seed)
+        stars: list[dict[str, object]] = []
+        star_count = rng.randint(40, 60)
+        colored_chance = 0.08
+        tints = [(180, 200, 255), (255, 190, 190), (255, 240, 200)]
+        for _ in range(star_count):
+            roll = rng.random()
+            if roll < 0.7:
+                size = 1
+            elif roll < 0.95:
+                size = 2
+            else:
+                size = 3
+            base_brightness = rng.randint(150, 255)
+            is_colored = rng.random() < colored_chance
+            tint = rng.choice(tints) if is_colored else (255, 255, 255)
+            stars.append(
+                {
+                    "x": chunk_x * self.star_chunk_size + rng.uniform(0, self.star_chunk_size),
+                    "y": chunk_y * self.star_chunk_size + rng.uniform(0, self.star_chunk_size),
+                    "size": size,
+                    "brightness": base_brightness,
+                    "tint": tint,
+                    "twinkle_speed": rng.uniform(0.01, 0.03),
+                    "twinkle_offset": rng.uniform(0, math.tau),
+                }
+            )
+        self.star_chunks[key] = stars
+        return stars
+
+    def _get_nebula_chunk(self, chunk_x: int, chunk_y: int) -> list[dict[str, object]]:
+        key = (chunk_x, chunk_y)
+        if key in self.nebula_chunks:
+            return self.nebula_chunks[key]
+
+        seed = (
+            self.background_seed
+            + chunk_x * 15187177
+            + chunk_y * 51790321
+        ) & 0xFFFFFFFF
+        rng = random.Random(seed)
+        nebulae: list[dict[str, object]] = []
+        if rng.random() < 0.3:
+            radius = rng.randint(400, 800)
+            color = rng.choice([(255, 100, 150), (150, 100, 255), (100, 150, 255)])
+            alpha = rng.randint(15, 35)
+            surface = self._create_nebula_surface(radius, color, alpha)
+            nebulae.append(
+                {
+                    "x": chunk_x * self.nebula_chunk_size + rng.uniform(0, self.nebula_chunk_size),
+                    "y": chunk_y * self.nebula_chunk_size + rng.uniform(0, self.nebula_chunk_size),
+                    "radius": radius,
+                    "surface": surface,
+                }
+            )
+        self.nebula_chunks[key] = nebulae
+        return nebulae
+
+    def _create_nebula_surface(
+        self, radius: int, color: tuple[int, int, int], alpha: int
+    ) -> pygame.Surface:
+        diameter = radius * 2
+        surface = pygame.Surface((diameter, diameter), pygame.SRCALPHA)
+        steps = 12
+        for step in range(steps):
+            ratio = 1 - step / steps
+            layer_radius = int(radius * ratio)
+            layer_alpha = int(alpha * (ratio**2))
+            if layer_radius <= 0 or layer_alpha <= 0:
+                continue
+            pygame.draw.circle(
+                surface,
+                (*color, layer_alpha),
+                (radius, radius),
+                layer_radius,
+            )
+        return surface
+
+    def _draw_nebulae(
+        self, cam_x: float, cam_y: float, shake_x: float, shake_y: float
+    ) -> None:
+        width, height = self.screen.get_size()
+        start_chunk_x = int(math.floor(cam_x / self.nebula_chunk_size))
+        start_chunk_y = int(math.floor(cam_y / self.nebula_chunk_size))
+        end_chunk_x = int(math.floor((cam_x + width) / self.nebula_chunk_size)) + 1
+        end_chunk_y = int(math.floor((cam_y + height) / self.nebula_chunk_size)) + 1
+
+        for chunk_x in range(start_chunk_x, end_chunk_x):
+            for chunk_y in range(start_chunk_y, end_chunk_y):
+                for nebula in self._get_nebula_chunk(chunk_x, chunk_y):
+                    nebula_x = float(nebula["x"])
+                    nebula_y = float(nebula["y"])
+                    radius = int(nebula["radius"])
+                    screen_x = int(nebula_x - cam_x + shake_x)
+                    screen_y = int(nebula_y - cam_y + shake_y)
+                    if (
+                        screen_x + radius < 0
+                        or screen_x - radius > width
+                        or screen_y + radius < 0
+                        or screen_y - radius > height
+                    ):
+                        continue
+                    surface = nebula["surface"]
+                    self.screen.blit(surface, (screen_x - radius, screen_y - radius))
+
+    def _draw_stars(
+        self, cam_x: float, cam_y: float, shake_x: float, shake_y: float
+    ) -> None:
+        width, height = self.screen.get_size()
+        start_chunk_x = int(math.floor(cam_x / self.star_chunk_size))
+        start_chunk_y = int(math.floor(cam_y / self.star_chunk_size))
+        end_chunk_x = int(math.floor((cam_x + width) / self.star_chunk_size)) + 1
+        end_chunk_y = int(math.floor((cam_y + height) / self.star_chunk_size)) + 1
+        time_seconds = pygame.time.get_ticks() / 1000.0
+
+        for chunk_x in range(start_chunk_x, end_chunk_x):
+            for chunk_y in range(start_chunk_y, end_chunk_y):
+                for star in self._get_star_chunk(chunk_x, chunk_y):
+                    world_x = float(star["x"])
+                    world_y = float(star["y"])
+                    screen_x = int(world_x - cam_x + shake_x)
+                    screen_y = int(world_y - cam_y + shake_y)
+                    if screen_x < -3 or screen_x > width + 3 or screen_y < -3 or screen_y > height + 3:
+                        continue
+                    base_brightness = float(star["brightness"])
+                    twinkle_speed = float(star["twinkle_speed"])
+                    twinkle_offset = float(star["twinkle_offset"])
+                    brightness = base_brightness + math.sin(time_seconds * twinkle_speed + twinkle_offset) * 55
+                    brightness = max(80, min(255, brightness))
+                    tint = star["tint"]
+                    factor = brightness / 255.0
+                    color = (
+                        int(tint[0] * factor),
+                        int(tint[1] * factor),
+                        int(tint[2] * factor),
+                    )
+                    size = int(star["size"])
+                    if size <= 1:
+                        self.screen.set_at((screen_x, screen_y), color)
+                    else:
+                        pygame.draw.circle(self.screen, color, (screen_x, screen_y), size)
+
+    def _update_shooting_stars(self, dt: float) -> None:
+        if random.random() < dt * 0.02:
+            cam_x, cam_y = self._get_camera_origin()
+            width, height = self.screen.get_size()
+            edge = random.choice(["left", "right", "top", "bottom"])
+            if edge == "left":
+                start_x = cam_x - 40
+                start_y = cam_y + random.uniform(0, height)
+                vx = random.uniform(120, 180)
+                vy = random.uniform(-30, 30)
+            elif edge == "right":
+                start_x = cam_x + width + 40
+                start_y = cam_y + random.uniform(0, height)
+                vx = random.uniform(-180, -120)
+                vy = random.uniform(-30, 30)
+            elif edge == "top":
+                start_x = cam_x + random.uniform(0, width)
+                start_y = cam_y - 40
+                vx = random.uniform(-60, 60)
+                vy = random.uniform(120, 180)
+            else:
+                start_x = cam_x + random.uniform(0, width)
+                start_y = cam_y + height + 40
+                vx = random.uniform(-60, 60)
+                vy = random.uniform(-180, -120)
+            self.shooting_stars.append(
+                {"x": start_x, "y": start_y, "vx": vx, "vy": vy, "ttl": random.uniform(1.2, 2.0)}
+            )
+
+        for star in self.shooting_stars:
+            star["x"] += star["vx"] * dt
+            star["y"] += star["vy"] * dt
+            star["ttl"] -= dt
+        self.shooting_stars = [star for star in self.shooting_stars if star["ttl"] > 0]
+
+    def _draw_shooting_stars(
+        self, cam_x: float, cam_y: float, shake_x: float, shake_y: float
+    ) -> None:
+        if not self.shooting_stars:
+            return
+        width, height = self.screen.get_size()
+        for star in self.shooting_stars:
+            screen_x = int(star["x"] - cam_x + shake_x)
+            screen_y = int(star["y"] - cam_y + shake_y)
+            if screen_x < -100 or screen_x > width + 100 or screen_y < -100 or screen_y > height + 100:
+                continue
+            vx = star["vx"]
+            vy = star["vy"]
+            length = 40
+            mag = math.hypot(vx, vy)
+            if mag == 0:
+                continue
+            nx = vx / mag
+            ny = vy / mag
+            tail_x = int(screen_x - nx * length)
+            tail_y = int(screen_y - ny * length)
+            pygame.draw.line(self.screen, (220, 220, 255), (tail_x, tail_y), (screen_x, screen_y), 2)
+            pygame.draw.circle(self.screen, (255, 255, 255), (screen_x, screen_y), 2)
+
+    def _draw_vignette(self) -> None:
+        width, height = self.screen.get_size()
+        if self.vignette_surface is None or self.vignette_size != (width, height):
+            self.vignette_surface = pygame.Surface((width, height), pygame.SRCALPHA)
+            self.vignette_surface.fill((0, 0, 0, 0))
+            steps = 12
+            for step in range(steps):
+                alpha = int(90 * (step + 1) / steps)
+                inset = step * 4
+                rect = pygame.Rect(inset, inset, width - inset * 2, height - inset * 2)
+                pygame.draw.rect(self.vignette_surface, (0, 0, 0, alpha), rect, 4)
+            self.vignette_size = (width, height)
+        if self.vignette_surface is not None:
+            self.screen.blit(self.vignette_surface, (0, 0))
 
     def _get_player_triangle(self, x: float, y: float, angle: float) -> list[tuple[float, float]]:
         size = PLAYER_RADIUS + 4
