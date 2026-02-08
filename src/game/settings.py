@@ -17,7 +17,7 @@ PLAYER_SPEED = 396.0  # Reduced from 468 for better balance
 PLAYER_RADIUS = 12
 PLAYER_MAX_HP = 100
 
-# Ship physics tuning (shared for player/enemies for now)
+# Ship physics tuning (player only - enemies use simple homing)
 ROTATION_SPEED = 240  # deg/sec - Fast enough to feel responsive
 ROTATION_ACCEL = 800  # Instant turn start (no sluggishness)
 

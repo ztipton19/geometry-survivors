@@ -163,21 +163,27 @@ def apply_player_controls(
 
 
 def update_enemy_ai(enemies: Iterable[object], player_pos: tuple[float, float], dt: float) -> None:
+    """Simple homing behavior - enemies move directly toward player at constant speed."""
     px, py = player_pos
     for enemy in enemies:
         body = getattr(enemy, "body", None)
         if body is None:
             continue
+
+        # Calculate direction to player
         dx = px - body.position.x
         dy = py - body.position.y
-        desired = math.atan2(dy, dx)
-        angle_diff = (desired - body.angle + math.pi) % (2 * math.pi) - math.pi
-        if abs(angle_diff) > 0.05:
-            turn_direction = 1.0 if angle_diff > 0 else -1.0
-        else:
-            turn_direction = 0.0
-        apply_rotation(body, turn_direction, dt)
-        apply_thrust(body, THRUST_POWER)
+        distance = math.sqrt(dx * dx + dy * dy)
+
+        if distance > 0.1:  # Avoid division by zero
+            # Normalize direction and set velocity directly
+            enemy_speed = getattr(enemy, "speed", 138.0)
+            vx = (dx / distance) * enemy_speed
+            vy = (dy / distance) * enemy_speed
+            body.velocity = pymunk.Vec2d(vx, vy)
+
+            # Rotate enemy to face movement direction (visual only)
+            body.angle = math.atan2(dy, dx) + math.pi / 2  # +90° because ship points up
 
 
 def sync_entity_positions(entities: Iterable[object]) -> None:
@@ -190,12 +196,8 @@ def sync_entity_positions(entities: Iterable[object]) -> None:
 
 
 def clamp_entity_speeds(player: object, enemies: Iterable[object]) -> None:
+    """Clamp player speed - enemies use direct velocity setting so don't need clamping."""
     player_body = getattr(player, "body", None)
     if player_body is not None:
         speed_multiplier = float(player.get_speed()) / PLAYER_SPEED
         clamp_speed(player_body, MAX_SPEED * speed_multiplier)
-    for enemy in enemies:
-        body = getattr(enemy, "body", None)
-        if body is None:
-            continue
-        clamp_speed(body, MAX_SPEED)
