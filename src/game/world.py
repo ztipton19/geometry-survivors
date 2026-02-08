@@ -312,6 +312,7 @@ class Game:
             self.state = "LOSE"
 
         self._update_particles(dt)
+        self._spawn_engine_particles()  # Continuous engine thrust particles
         for laser in self.lasers:
             laser.ttl -= dt
         for pulse in self.emp_pulses:
@@ -452,6 +453,12 @@ class Game:
         triangle = self._get_player_triangle(screen_px, screen_py, angle)
         pygame.draw.polygon(self.screen, (20, 40, 80), triangle, 0)
         pygame.draw.polygon(self.screen, NEON_BLUE, triangle, 2)
+
+        # Draw bright front tip glow for directionality
+        # Front tip is the first point in the triangle
+        front_x, front_y = triangle[0]
+        pygame.draw.circle(self.screen, (255, 255, 255), (int(front_x), int(front_y)), 3, 0)
+        pygame.draw.circle(self.screen, NEON_CYAN, (int(front_x), int(front_y)), 5, 1)
         
         # Draw shield if active
         if self.player.shield_level >= 0 and self.player.shield_hp > 0:
@@ -711,6 +718,57 @@ class Game:
                 )
             )
 
+    def _spawn_engine_particles(self) -> None:
+        """Spawn engine thrust particles from the back of the ship."""
+        if self.player.body is None:
+            return
+
+        angle = float(self.player.body.angle)
+        px, py = self.player.pos
+
+        # Get velocity to scale particle intensity
+        vx, vy = self.player.body.velocity
+        speed = math.hypot(vx, vy)
+
+        # Only spawn particles if moving or throttle is applied
+        if speed < 5.0:
+            return
+
+        # Calculate back of ship position
+        size = PLAYER_RADIUS + 4
+        back_offset = size * 0.8  # Position at back of ship
+        back_x = px - math.sin(angle) * back_offset
+        back_y = py + math.cos(angle) * back_offset
+
+        # Spawn 1-2 particles per frame depending on speed
+        particle_count = 1 if random.random() > 0.5 else 2
+
+        for _ in range(particle_count):
+            # Particles shoot out the back (opposite of ship direction)
+            particle_angle = angle + math.pi + random.uniform(-0.3, 0.3)
+            particle_speed = random.uniform(80, 150)
+
+            # Color shifts from cyan to white based on speed
+            intensity = min(1.0, speed / 300.0)
+            base_color = NEON_CYAN
+            color = (
+                int(base_color[0] + (255 - base_color[0]) * intensity * 0.3),
+                int(base_color[1] + (255 - base_color[1]) * intensity * 0.3),
+                int(base_color[2]),
+            )
+
+            self.particles.append(
+                Particle(
+                    x=back_x,
+                    y=back_y,
+                    vx=math.cos(particle_angle) * particle_speed,
+                    vy=math.sin(particle_angle) * particle_speed,
+                    ttl=random.uniform(0.15, 0.35),
+                    radius=random.uniform(1.2, 2.5),
+                    color=color,
+                )
+            )
+
     def _draw_background(
         self, cam_x: float, cam_y: float, shake_x: float, shake_y: float
     ) -> None:
@@ -743,10 +801,11 @@ class Game:
 
     def _get_player_triangle(self, x: float, y: float, angle: float) -> list[tuple[float, float]]:
         size = PLAYER_RADIUS + 4
+        # More elongated, arrow-shaped triangle for clearer directionality
         points = [
-            (0.0, -size),
-            (-size * 0.85, size * 0.7),
-            (size * 0.85, size * 0.7),
+            (0.0, -size * 1.3),  # Front point - extended forward
+            (-size * 0.7, size * 0.8),  # Back left - wider base
+            (size * 0.7, size * 0.8),   # Back right - wider base
         ]
         sin_a = math.sin(angle)
         cos_a = math.cos(angle)
