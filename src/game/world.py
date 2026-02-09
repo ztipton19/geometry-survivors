@@ -17,6 +17,7 @@ from game.entities.laser import LaserBeam
 from game.entities.player import Player
 from game.entities.rocket import Rocket
 from game.entities.xpgem import XPGem
+from game.cutscene import Cutscene
 from game.input import handle_player_input
 from game.physics import (
     attach_body,
@@ -50,7 +51,6 @@ from game.systems import collisions, combat, progression, spawner, upgrades, xp
 from game.ui import (
     draw_end_screen,
     draw_hud,
-    draw_intro_screen,
     get_level_up_card_rects,
     draw_level_up_screen,
     draw_options_menu,
@@ -100,6 +100,8 @@ class Game:
         self.menu_selection = 0
         self.options_selection = 0
         self.pause_selection = 0
+        self.cutscene: Cutscene | None = None
+        self.cutscene_font = pygame.font.SysFont("consolas", 24)
 
         self.background_seed = 1337
         self.star_chunk_size = 500
@@ -137,8 +139,26 @@ class Game:
         self.state = "PLAY"
         self.upgrade_options.clear()
         self.upgrade_resume_grace = 0.0
+        self.cutscene = None
+
+    def _start_intro_cutscene(self) -> None:
+        intro_text = (
+            "Mission Brief: Clone Pilot #2847\n\n"
+            "You are one of thousands. Every pilot before you has been lost to the void.\n"
+            "Each clone carries the combat data of those who came before.\n"
+            "Your mission: gather more data. Survive as long as you can.\n\n"
+            "The enemy is unknown. Their origin is unknown.\n"
+            "But they are endless.\n\n"
+            "Good luck, pilot. You'll need it."
+        )
+        self.cutscene = Cutscene(intro_text, typing_speed=40.0)
+        self.state = "CUTSCENE"
 
     def update(self, dt: float) -> None:
+        if self.state == "CUTSCENE":
+            if self.cutscene:
+                self.cutscene.update(dt)
+            return
         if self.state != "PLAY":
             return
         if self.upgrade_resume_grace > 0:
@@ -360,8 +380,8 @@ class Game:
             )
             pygame.display.flip()
             return
-        if self.state == "INTRO":
-            draw_intro_screen(self.screen, self.font, self.big_font)
+        if self.state == "CUTSCENE" and self.cutscene:
+            self.cutscene.draw(self.screen, self.cutscene_font)
             pygame.display.flip()
             return
 
@@ -540,7 +560,7 @@ class Game:
                         elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
                             if self.menu_selection == 0:
                                 self.restart()
-                                self.state = "INTRO"
+                                self._start_intro_cutscene()
                             elif self.menu_selection == 1:
                                 self.state = "OPTIONS"
                             elif self.menu_selection == 2:
@@ -575,8 +595,13 @@ class Game:
                                 self.state = "MENU"
                         elif event.key == pygame.K_ESCAPE:
                             self.state = "MENU"
-                    elif self.state == "INTRO":
-                        self.state = "PLAY"
+                    elif self.state == "CUTSCENE":
+                        if event.key == pygame.K_SPACE and self.cutscene:
+                            if self.cutscene.finished:
+                                self.state = "PLAY"
+                                self.cutscene = None
+                            else:
+                                self.cutscene.skip()
                     elif self.state == "PLAY":
                         if event.key == pygame.K_ESCAPE:
                             self.state = "PAUSE"
@@ -633,6 +658,7 @@ class Game:
         flags = pygame.FULLSCREEN if self.fullscreen else 0
         self.screen = pygame.display.set_mode((width, height), flags)
         self.font, self.big_font = assets.load_fonts()
+        self.cutscene_font = pygame.font.SysFont("consolas", 24)
 
     def _select_upgrade(self, index: int) -> None:
         if index < 0 or index >= len(self.upgrade_options):
