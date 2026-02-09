@@ -42,6 +42,7 @@ from game.settings import (
     NEON_ORANGE,
     NEON_YELLOW,
     PLAYER_RADIUS,
+    RED,
     WHITE,
     get_ship_selection_colors,
 )

@@ -1,5 +1,7 @@
 """UI rendering helpers."""
 
+from __future__ import annotations
+
 import pygame
 
 from game.entities.player import Player
