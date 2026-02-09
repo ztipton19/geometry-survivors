@@ -40,6 +40,8 @@ def attach_body(space: pymunk.Space, entity: object, radius: float) -> None:
     moment = pymunk.moment_for_circle(mass, 0.0, radius)
     body = pymunk.Body(mass, moment)
     body.position = (getattr(entity, "x"), getattr(entity, "y"))
+    body.velocity = (0.0, 0.0)
+    body.angular_velocity = 0.0
     shape = pymunk.Circle(body, radius)
     shape.elasticity = 0.2
     shape.friction = 0.5
