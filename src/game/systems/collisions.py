@@ -131,6 +131,38 @@ def resolve_laser_hits(
             )
 
 
+def resolve_mine_hits(
+    mines: list,
+    enemies: list[Enemy],
+    player: Player,
+    xpgems: list[XPGem],
+    death_positions: list[tuple[float, float]],
+    hit_positions: list[tuple[float, float]],
+) -> None:
+    for mine in mines:
+        triggered = False
+        for enemy in enemies:
+            if dist2(mine.x, mine.y, enemy.x, enemy.y) <= mine.trigger_radius**2:
+                triggered = True
+                break
+
+        if not triggered:
+            continue
+
+        for enemy in enemies:
+            if dist2(mine.x, mine.y, enemy.x, enemy.y) <= mine.splash_radius**2:
+                apply_enemy_damage(
+                    enemy,
+                    mine.damage,
+                    player,
+                    xpgems,
+                    death_positions,
+                    hit_positions,
+                    (mine.x, mine.y),
+                )
+        mine.ttl = 0
+
+
 def resolve_player_hits(player: Player, enemies: list[Enemy], dt: float) -> float:
     """Handle enemy-player collisions, with shield damage absorption."""
     px, py = player.pos

@@ -13,6 +13,7 @@ from game.entities.enemy import Enemy
 from game.entities.particle import Particle
 from game.entities.emp_pulse import EmpPulse
 from game.entities.laser import LaserBeam
+from game.entities.mine import Mine
 from game.entities.player import Player
 from game.entities.rocket import Rocket
 from game.entities.xpgem import XPGem
@@ -81,6 +82,7 @@ class Game:
         self.rockets: list[Rocket] = []
         self.lasers: list[LaserBeam] = []
         self.emp_pulses: list[EmpPulse] = []
+        self.mines: list[Mine] = []
         self.xpgems: list[XPGem] = []
         self.particles: list[Particle] = []
 
@@ -88,6 +90,7 @@ class Game:
         self.rocket_timer = 0.0
         self.laser_timer = 0.0
         self.emp_timer = 0.0
+        self.mine_timer = 0.0
         self.shake_timer = 0.0
         self.shake_strength = 0.0
 
@@ -124,12 +127,14 @@ class Game:
         self.rockets.clear()
         self.lasers.clear()
         self.emp_pulses.clear()
+        self.mines.clear()
         self.xpgems.clear()
         self.particles.clear()
         self.fire_timer = 0.0
         self.rocket_timer = 0.0
         self.laser_timer = 0.0
         self.emp_timer = 0.0
+        self.mine_timer = 0.0
         self.shake_timer = 0.0
         self.shake_strength = 0.0
         self.shooting_stars.clear()
@@ -260,6 +265,30 @@ class Game:
                             (enemy.x, enemy.y),
                         )
 
+        if self.player.mines_level >= 0:
+            mine_stats = self.player.get_mine_stats()
+            self.mine_timer += dt
+            while self.mine_timer >= mine_stats["drop_cooldown"]:
+                self.mine_timer -= mine_stats["drop_cooldown"]
+                angle = 0.0
+                if self.player.body is not None:
+                    angle = float(self.player.body.angle)
+                drop_distance = PLAYER_RADIUS + 18
+                back_dx = -math.sin(angle)
+                back_dy = math.cos(angle)
+                mine_x = self.player.x + back_dx * drop_distance
+                mine_y = self.player.y + back_dy * drop_distance
+                self.mines.append(
+                    Mine(
+                        x=mine_x,
+                        y=mine_y,
+                        ttl=15.0,
+                        damage=55.0,
+                        splash_radius=80.0,
+                        trigger_radius=24.0,
+                    )
+                )
+
         combat.update_bullets(self.bullets, dt)
         combat.update_rockets(self.rockets, dt)
         self.bullets = [
@@ -273,6 +302,9 @@ class Game:
             if rocket.ttl > 0
         ]
         self.lasers = [laser for laser in self.lasers if laser.ttl > 0]
+        for mine in self.mines:
+            mine.ttl -= dt
+        self.mines = [mine for mine in self.mines if mine.ttl > 0]
 
         collisions.resolve_bullet_hits(
             self.bullets,
@@ -284,6 +316,14 @@ class Game:
         )
         collisions.resolve_rocket_hits(
             self.rockets,
+            self.enemies,
+            self.player,
+            self.xpgems,
+            death_positions,
+            hit_positions,
+        )
+        collisions.resolve_mine_hits(
+            self.mines,
             self.enemies,
             self.player,
             self.xpgems,
@@ -472,6 +512,13 @@ class Game:
                 2,
             )
             self.screen.blit(pulse_surface, (0, 0))
+
+        for mine in self.mines:
+            mine_x, mine_y = self._world_to_screen(
+                mine.x, mine.y, cam_x, cam_y, shake_x, shake_y
+            )
+            pygame.draw.circle(self.screen, NEON_ORANGE, (mine_x, mine_y), 8, 2)
+            pygame.draw.circle(self.screen, RED, (mine_x, mine_y), 3, 0)
 
         for enemy in self.enemies:
             self._draw_enemy(enemy, cam_x, cam_y, shake_x, shake_y)
@@ -1132,6 +1179,11 @@ class Game:
         if self.player.emp_level >= 0:
             emp_ratio = min(1.0, self.emp_timer / 0.5)
 
+        mine_ratio = 0.0
+        if self.player.mines_level >= 0:
+            mine_cd = self.player.get_mine_stats()["drop_cooldown"]
+            mine_ratio = min(1.0, self.mine_timer / max(0.0001, mine_cd))
+
         return [
             {
                 "label": "MINIGUN",
@@ -1158,10 +1210,10 @@ class Game:
                 "icon_color": NEON_MAGENTA if self.player.emp_level >= 0 else (70, 70, 70),
             },
             {
-                "label": "FORWARD",
-                "type_icon": "→",
-                "cooldown_ratio": 0.0,
-                "icon_color": (70, 70, 70),
+                "label": "MINES",
+                "type_icon": "✹",
+                "cooldown_ratio": mine_ratio,
+                "icon_color": NEON_ORANGE if self.player.mines_level >= 0 else (70, 70, 70),
             },
             {
                 "label": "LOCKED",
