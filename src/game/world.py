@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 import random
-import sys
 
 import pygame
 
@@ -319,7 +318,6 @@ class Game:
 
         for pos in death_positions:
             self._spawn_explosion(pos, RED, 12)
-            self._add_screen_shake(5.0)
 
         for pos in hit_positions:
             self._spawn_hit_sparks(pos)
@@ -545,111 +543,111 @@ class Game:
         pygame.display.flip()
 
     def run(self) -> None:
-        while self.running:
-            dt = self.clock.tick(FPS) / 1000.0
+        try:
+            while self.running:
+                dt = self.clock.tick(FPS) / 1000.0
 
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    self.running = False
-                elif event.type == pygame.KEYDOWN:
-                    if self.state == "MENU":
-                        if event.key in (pygame.K_UP, pygame.K_w):
-                            self.menu_selection = (self.menu_selection - 1) % 3
-                        elif event.key in (pygame.K_DOWN, pygame.K_s):
-                            self.menu_selection = (self.menu_selection + 1) % 3
-                        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                            if self.menu_selection == 0:
-                                self.restart()
-                                self._start_intro_cutscene()
-                            elif self.menu_selection == 1:
-                                self.state = "OPTIONS"
-                            elif self.menu_selection == 2:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        self.running = False
+                    elif event.type == pygame.KEYDOWN:
+                        if self.state == "MENU":
+                            if event.key in (pygame.K_UP, pygame.K_w):
+                                self.menu_selection = (self.menu_selection - 1) % 3
+                            elif event.key in (pygame.K_DOWN, pygame.K_s):
+                                self.menu_selection = (self.menu_selection + 1) % 3
+                            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                                if self.menu_selection == 0:
+                                    self.restart()
+                                    self._start_intro_cutscene()
+                                elif self.menu_selection == 1:
+                                    self.state = "OPTIONS"
+                                elif self.menu_selection == 2:
+                                    self.running = False
+                            elif event.key == pygame.K_ESCAPE:
                                 self.running = False
-                        elif event.key == pygame.K_ESCAPE:
-                            self.running = False
-                    elif self.state == "OPTIONS":
-                        if event.key in (pygame.K_UP, pygame.K_w):
-                            self.options_selection = (self.options_selection - 1) % 3
-                        elif event.key in (pygame.K_DOWN, pygame.K_s):
-                            self.options_selection = (self.options_selection + 1) % 3
-                        elif event.key in (pygame.K_LEFT, pygame.K_a):
-                            if self.options_selection == 0:
-                                self.resolution_index = (self.resolution_index - 1) % len(
-                                    self.available_resolutions
-                                )
-                                self._apply_display_mode()
-                            elif self.options_selection == 1:
-                                self.fullscreen = not self.fullscreen
-                                self._apply_display_mode()
-                        elif event.key in (pygame.K_RIGHT, pygame.K_d):
-                            if self.options_selection == 0:
-                                self.resolution_index = (self.resolution_index + 1) % len(
-                                    self.available_resolutions
-                                )
-                                self._apply_display_mode()
-                            elif self.options_selection == 1:
-                                self.fullscreen = not self.fullscreen
-                                self._apply_display_mode()
-                        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                            if self.options_selection == 2:
+                        elif self.state == "OPTIONS":
+                            if event.key in (pygame.K_UP, pygame.K_w):
+                                self.options_selection = (self.options_selection - 1) % 3
+                            elif event.key in (pygame.K_DOWN, pygame.K_s):
+                                self.options_selection = (self.options_selection + 1) % 3
+                            elif event.key in (pygame.K_LEFT, pygame.K_a):
+                                if self.options_selection == 0:
+                                    self.resolution_index = (self.resolution_index - 1) % len(
+                                        self.available_resolutions
+                                    )
+                                    self._apply_display_mode()
+                                elif self.options_selection == 1:
+                                    self.fullscreen = not self.fullscreen
+                                    self._apply_display_mode()
+                            elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                                if self.options_selection == 0:
+                                    self.resolution_index = (self.resolution_index + 1) % len(
+                                        self.available_resolutions
+                                    )
+                                    self._apply_display_mode()
+                                elif self.options_selection == 1:
+                                    self.fullscreen = not self.fullscreen
+                                    self._apply_display_mode()
+                            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                                if self.options_selection == 2:
+                                    self.state = "MENU"
+                            elif event.key == pygame.K_ESCAPE:
                                 self.state = "MENU"
-                        elif event.key == pygame.K_ESCAPE:
-                            self.state = "MENU"
-                    elif self.state == "CUTSCENE":
-                        if event.key == pygame.K_SPACE and self.cutscene:
-                            if self.cutscene.finished:
+                        elif self.state == "CUTSCENE":
+                            if event.key == pygame.K_SPACE and self.cutscene:
+                                if self.cutscene.finished:
+                                    self.state = "PLAY"
+                                    self.cutscene = None
+                                else:
+                                    self.cutscene.skip()
+                        elif self.state == "PLAY":
+                            if event.key == pygame.K_ESCAPE:
+                                self.state = "PAUSE"
+                        elif self.state == "PAUSE":
+                            if event.key == pygame.K_ESCAPE:
                                 self.state = "PLAY"
-                                self.cutscene = None
-                            else:
-                                self.cutscene.skip()
-                    elif self.state == "PLAY":
-                        if event.key == pygame.K_ESCAPE:
-                            self.state = "PAUSE"
-                    elif self.state == "PAUSE":
-                        if event.key == pygame.K_ESCAPE:
-                            self.state = "PLAY"
-                        elif event.key in (pygame.K_UP, pygame.K_w):
-                            self.pause_selection = (self.pause_selection - 1) % 3
-                        elif event.key in (pygame.K_DOWN, pygame.K_s):
-                            self.pause_selection = (self.pause_selection + 1) % 3
-                        elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
-                            if self.pause_selection == 0:
-                                self.state = "PLAY"
-                            elif self.pause_selection == 1:
+                            elif event.key in (pygame.K_UP, pygame.K_w):
+                                self.pause_selection = (self.pause_selection - 1) % 3
+                            elif event.key in (pygame.K_DOWN, pygame.K_s):
+                                self.pause_selection = (self.pause_selection + 1) % 3
+                            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                                if self.pause_selection == 0:
+                                    self.state = "PLAY"
+                                elif self.pause_selection == 1:
+                                    self.restart()
+                                elif self.pause_selection == 2:
+                                    self.state = "MENU"
+                        elif self.state in ("WIN", "LOSE"):
+                            if event.key == pygame.K_r:
                                 self.restart()
-                            elif self.pause_selection == 2:
-                                self.state = "MENU"
-                    elif self.state in ("WIN", "LOSE"):
-                        if event.key == pygame.K_r:
-                            self.restart()
-                        elif event.key == pygame.K_ESCAPE:
-                            self.running = False
-                    # Level-up key selection
-                    if self.state == "LEVEL_UP":
-                        if event.key == pygame.K_1 and len(self.upgrade_options) >= 1:
-                            self._select_upgrade(0)
-                        elif event.key == pygame.K_2 and len(self.upgrade_options) >= 2:
-                            self._select_upgrade(1)
-                        elif event.key == pygame.K_3 and len(self.upgrade_options) >= 3:
-                            self._select_upgrade(2)
-                elif (
-                    event.type == pygame.MOUSEBUTTONDOWN
-                    and event.button == 1
-                    and self.state == "LEVEL_UP"
-                ):
-                    card_rects = get_level_up_card_rects(
-                        self.screen, len(self.upgrade_options)
-                    )
-                    for i, rect in enumerate(card_rects):
-                        if rect.collidepoint(event.pos):
-                            self._select_upgrade(i)
-                            break
+                            elif event.key == pygame.K_ESCAPE:
+                                self.running = False
+                        # Level-up key selection
+                        if self.state == "LEVEL_UP":
+                            if event.key == pygame.K_1 and len(self.upgrade_options) >= 1:
+                                self._select_upgrade(0)
+                            elif event.key == pygame.K_2 and len(self.upgrade_options) >= 2:
+                                self._select_upgrade(1)
+                            elif event.key == pygame.K_3 and len(self.upgrade_options) >= 3:
+                                self._select_upgrade(2)
+                    elif (
+                        event.type == pygame.MOUSEBUTTONDOWN
+                        and event.button == 1
+                        and self.state == "LEVEL_UP"
+                    ):
+                        card_rects = get_level_up_card_rects(
+                            self.screen, len(self.upgrade_options)
+                        )
+                        for i, rect in enumerate(card_rects):
+                            if rect.collidepoint(event.pos):
+                                self._select_upgrade(i)
+                                break
 
-            self.update(dt)
-            self.draw()
-
-        pygame.quit()
-        sys.exit()
+                self.update(dt)
+                self.draw()
+        finally:
+            pygame.quit()
 
     def _apply_display_mode(self) -> None:
         _, (width, height) = self.available_resolutions[self.resolution_index]
