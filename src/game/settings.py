@@ -33,20 +33,20 @@ PLAYER_MAX_HP = 100
 ROTATION_SPEED = 240  # deg/sec - Fast enough to feel responsive
 ROTATION_ACCEL = 800  # Instant turn start (no sluggishness)
 
-THRUST_POWER = 48.75  # Balanced speed increase
-STRAFE_POWER = 42.9  # Balanced speed increase
-MAX_SPEED = 37.5  # Balanced speed increase
+THRUST_POWER = 73.125  # Balanced speed increase
+STRAFE_POWER = 64.35  # Balanced speed increase
+MAX_SPEED = 56.25  # Balanced speed increase
 MIN_SPEED = 0  # Can stop completely
 
 FRICTION = 0.98  # Slow natural deceleration
 DRIFT_FACTOR = 0.95  # High momentum carry (ice-like)
 
-REVERSE_POWER = 33  # Balanced speed increase
+REVERSE_POWER = 49.5  # Balanced speed increase
 THROTTLE_STEP_PER_SEC = 0.9
-BOOST_FORCE = 115.5  # Balanced speed increase
+BOOST_FORCE = 173.25  # Balanced speed increase
 BOOST_DURATION = 0.28
 BOOST_RECHARGE_TIME = 4.0
-HURDLE_IMPULSE = 23.1  # Balanced speed increase
+HURDLE_IMPULSE = 34.65  # Balanced speed increase
 HURDLE_COOLDOWN = 1.8
 
 BULLET_SPEED = 900.0
@@ -63,13 +63,13 @@ EMP_PULSE_LIFETIME = 0.25
 FIRE_COOLDOWN_START = 0.14
 FIRE_COOLDOWN_MIN = 0.04
 
-ENEMY_BASE_SPEED = 12.9375  # Balanced speed increase
+ENEMY_BASE_SPEED = 19.40625  # Balanced speed increase
 ENEMY_RADIUS = 12
 ENEMY_SPAWN_INTERVAL_START = 0.75
 ENEMY_SPAWN_INTERVAL_MIN = 0.18
 ENEMY_SPAWN_INTERVAL_DECAY = 0.0028
-ENEMY_SPEED_PER_SEC = 0.12
-ENEMY_SPEED_MAX_BONUS = 10.5
+ENEMY_SPEED_PER_SEC = 0.18
+ENEMY_SPEED_MAX_BONUS = 15.75
 ENEMY_HP_BASE = 22.0
 ENEMY_HP_PER_SEC = 0.32
 ENEMY_HP_MAX_BONUS = 70.0
