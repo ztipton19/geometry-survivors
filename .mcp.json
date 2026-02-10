@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "excalidraw": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@cmd8/excalidraw-mcp",
+        "--diagram",
+        "/home/zachary-tipton/github/geometry-survivors/excalidraw/gameplay-loop.excalidraw"
+      ]
+    }
+  }
+}

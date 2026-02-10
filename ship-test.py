@@ -6,7 +6,7 @@ import sys
 pygame.init()
 
 # Screen setup
-WIDTH, HEIGHT = 1000, 700
+WIDTH, HEIGHT = 1200, 700
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Belter Ship Design Test")
 clock = pygame.time.Clock()
@@ -168,6 +168,71 @@ def draw_belter_prospector(screen, pos, angle, color=(100, 120, 100)):
     pygame.draw.polygon(screen, (150, 200, 220), rotated_cockpit, 0)
 
 
+def draw_oba_catamaran(screen, pos, angle, color=(90, 130, 160)):
+    """
+    Outer Belt Alliance twin-hull catamaran
+    Two parallel pontoons connected by a wide base, with engine exhausts
+    Based on excalidraw design in geometry-survivors.excalidraw
+    """
+    # Left pontoon (tall, narrow)
+    left_hull = [
+        Vector2(-15, -20),
+        Vector2(-7, -20),
+        Vector2(-7, 4),
+        Vector2(-15, 4),
+    ]
+
+    # Right pontoon (tall, narrow)
+    right_hull = [
+        Vector2(7, -20),
+        Vector2(15, -20),
+        Vector2(15, 4),
+        Vector2(7, 4),
+    ]
+
+    # Connecting base (overlaps bottom of pontoons)
+    base = [
+        Vector2(-15, 0),
+        Vector2(15, 0),
+        Vector2(15, 14),
+        Vector2(-15, 14),
+    ]
+
+    # Left engine nozzle (simplified from freedraw exhaust curves)
+    left_engine = [
+        Vector2(-12, 14),
+        Vector2(-8, 14),
+        Vector2(-6, 20),
+        Vector2(-14, 20),
+    ]
+
+    # Right engine nozzle (simplified from freedraw exhaust curves)
+    right_engine = [
+        Vector2(8, 14),
+        Vector2(12, 14),
+        Vector2(14, 20),
+        Vector2(6, 20),
+    ]
+
+    # Draw hull and base
+    for shape in [base, left_hull, right_hull]:
+        rotated = [
+            (pos[0] + point.rotate(-angle).x, pos[1] + point.rotate(-angle).y)
+            for point in shape
+        ]
+        pygame.draw.polygon(screen, color, rotated, 0)
+        pygame.draw.polygon(screen, (140, 180, 210), rotated, 1)
+
+    # Draw engine nozzles with darker glow
+    for engine in [left_engine, right_engine]:
+        rotated = [
+            (pos[0] + point.rotate(-angle).x, pos[1] + point.rotate(-angle).y)
+            for point in engine
+        ]
+        pygame.draw.polygon(screen, (60, 100, 140), rotated, 0)
+        pygame.draw.polygon(screen, (140, 180, 210), rotated, 1)
+
+
 def draw_belter_triangle(screen, pos, angle, color=(120, 110, 90)):
     """
     Keep triangle but make it chunky and asymmetric
@@ -242,33 +307,39 @@ while running:
 
     # Hauler
     label1 = font.render("1. Hauler (Asymmetric Box)", True, (150, 150, 100))
-    screen.blit(label1, (80, label_y))
-    draw_belter_hauler(screen, (150, static_y), 0)
+    screen.blit(label1, (50, label_y))
+    draw_belter_hauler(screen, (120, static_y), 0)
 
     # Tug
     label2 = font.render("2. Tug (Compact)", True, (120, 100, 80))
-    screen.blit(label2, (320, label_y))
-    draw_belter_tug(screen, (400, static_y), 0)
+    screen.blit(label2, (260, label_y))
+    draw_belter_tug(screen, (330, static_y), 0)
 
     # Prospector
     label3 = font.render("3. Prospector (H-Shape)", True, (100, 120, 100))
-    screen.blit(label3, (550, label_y))
-    draw_belter_prospector(screen, (650, static_y), 0)
+    screen.blit(label3, (440, label_y))
+    draw_belter_prospector(screen, (530, static_y), 0)
 
     # Triangle
     label4 = font.render("4. Industrial Triangle", True, (120, 110, 90))
-    screen.blit(label4, (800, label_y))
-    draw_belter_triangle(screen, (880, static_y), 0)
+    screen.blit(label4, (650, label_y))
+    draw_belter_triangle(screen, (730, static_y), 0)
+
+    # OBA Catamaran
+    label5 = font.render("5. OBA Catamaran", True, (90, 130, 160))
+    screen.blit(label5, (880, label_y))
+    draw_oba_catamaran(screen, (960, static_y), 0)
 
     # Row 2: Rotating (to see profile)
     rotation_label = font.render("Rotating view:", True, (200, 200, 200))
     screen.blit(rotation_label, (20, 280))
 
     rotating_y = 380
-    draw_belter_hauler(screen, (150, rotating_y), rotation)
-    draw_belter_tug(screen, (400, rotating_y), rotation)
-    draw_belter_prospector(screen, (650, rotating_y), rotation)
-    draw_belter_triangle(screen, (880, rotating_y), rotation)
+    draw_belter_hauler(screen, (120, rotating_y), rotation)
+    draw_belter_tug(screen, (330, rotating_y), rotation)
+    draw_belter_prospector(screen, (530, rotating_y), rotation)
+    draw_belter_triangle(screen, (730, rotating_y), rotation)
+    draw_oba_catamaran(screen, (960, rotating_y), rotation)
 
     # Row 3: At 45 degrees (diagonal movement view)
     diagonal_label = font.render(
@@ -277,10 +348,11 @@ while running:
     screen.blit(diagonal_label, (20, 480))
 
     diagonal_y = 580
-    draw_belter_hauler(screen, (150, diagonal_y), 45)
-    draw_belter_tug(screen, (400, diagonal_y), 45)
-    draw_belter_prospector(screen, (650, diagonal_y), 45)
-    draw_belter_triangle(screen, (880, diagonal_y), 45)
+    draw_belter_hauler(screen, (120, diagonal_y), 45)
+    draw_belter_tug(screen, (330, diagonal_y), 45)
+    draw_belter_prospector(screen, (530, diagonal_y), 45)
+    draw_belter_triangle(screen, (730, diagonal_y), 45)
+    draw_oba_catamaran(screen, (960, diagonal_y), 45)
 
     # Instructions
     instruction = font.render("ESC to quit | Rotation auto-animates", True, (150, 150, 150))

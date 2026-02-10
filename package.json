@@ -1,0 +1,21 @@
+{
+  "name": "geometry-survivors",
+  "version": "1.0.0",
+  "description": "A neon-flavored top-down survival prototype inspired by arena shooters. The player auto-fires a minigun at the nearest enemy while you dodge swarms for 15 minutes.",
+  "main": "excalidraw/generate-file-list.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "files": "node excalidraw/generate-file-list.js",
+    "files:watch": "node excalidraw/generate-file-list.js --watch",
+    "viewer": "bash excalidraw/start-viewer.sh",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "chokidar": "^5.0.0"
+  }
+}
