@@ -17,6 +17,7 @@ from game.settings import (
     HURDLE_IMPULSE,
     MAX_SPEED,
     MIN_SPEED,
+    ENEMY_BASE_SPEED,
     ROTATION_ACCEL,
     ROTATION_SPEED,
     STRAFE_POWER,
@@ -189,7 +190,7 @@ def update_enemy_ai(enemies: Iterable[object], player_pos: tuple[float, float], 
 
         if distance > 0.1:  # Avoid division by zero
             # Normalize direction and set velocity directly
-            enemy_speed = getattr(enemy, "speed", 138.0)
+            enemy_speed = getattr(enemy, "speed", ENEMY_BASE_SPEED)
             vx = (dx / distance) * enemy_speed
             vy = (dy / distance) * enemy_speed
             body.velocity = pymunk.Vec2d(vx, vy)

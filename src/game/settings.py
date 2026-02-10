@@ -25,7 +25,7 @@ def get_ship_selection_colors() -> dict[str, tuple[int, int, int]]:
         "xp_bar": NEON_YELLOW,
     }
 
-PLAYER_SPEED = 396.0  # Reduced from 468 for better balance
+PLAYER_SPEED = 297.0  # Reduced from 396 for slower movement
 PLAYER_RADIUS = 12
 PLAYER_MAX_HP = 100
 
@@ -33,20 +33,20 @@ PLAYER_MAX_HP = 100
 ROTATION_SPEED = 240  # deg/sec - Fast enough to feel responsive
 ROTATION_ACCEL = 800  # Instant turn start (no sluggishness)
 
-THRUST_POWER = 650  # Balanced speed increase
-STRAFE_POWER = 572  # Balanced speed increase
-MAX_SPEED = 500  # Balanced speed increase
+THRUST_POWER = 487.5  # Balanced speed increase
+STRAFE_POWER = 429.0  # Balanced speed increase
+MAX_SPEED = 375  # Balanced speed increase
 MIN_SPEED = 0  # Can stop completely
 
 FRICTION = 0.92  # Slow natural deceleration
 DRIFT_FACTOR = 0.95  # High momentum carry (ice-like)
 
-REVERSE_POWER = 440  # Balanced speed increase
+REVERSE_POWER = 330  # Balanced speed increase
 THROTTLE_STEP_PER_SEC = 0.9
-BOOST_FORCE = 1540  # Balanced speed increase
+BOOST_FORCE = 1155  # Balanced speed increase
 BOOST_DURATION = 0.28
 BOOST_RECHARGE_TIME = 4.0
-HURDLE_IMPULSE = 308.0  # Balanced speed increase
+HURDLE_IMPULSE = 231.0  # Balanced speed increase
 HURDLE_COOLDOWN = 1.8
 
 BULLET_SPEED = 900.0
@@ -63,13 +63,13 @@ EMP_PULSE_LIFETIME = 0.25
 FIRE_COOLDOWN_START = 0.14
 FIRE_COOLDOWN_MIN = 0.04
 
-ENEMY_BASE_SPEED = 138.0  # Balanced speed increase
+ENEMY_BASE_SPEED = 103.5  # Balanced speed increase
 ENEMY_RADIUS = 12
 ENEMY_SPAWN_INTERVAL_START = 0.75
 ENEMY_SPAWN_INTERVAL_MIN = 0.18
 ENEMY_SPAWN_INTERVAL_DECAY = 0.0028
-ENEMY_SPEED_PER_SEC = 1.6
-ENEMY_SPEED_MAX_BONUS = 140.0
+ENEMY_SPEED_PER_SEC = 1.2
+ENEMY_SPEED_MAX_BONUS = 105.0
 ENEMY_HP_BASE = 22.0
 ENEMY_HP_PER_SEC = 0.32
 ENEMY_HP_MAX_BONUS = 70.0

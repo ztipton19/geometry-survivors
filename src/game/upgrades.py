@@ -190,12 +190,12 @@ UPGRADES: dict[str, Upgrade] = {
         category="utility",
         max_level=5,
         values=[
+            {"speed": 270.0},
+            {"speed": 292.5},
+            {"speed": 315.0},
+            {"speed": 337.5},
             {"speed": 360.0},
-            {"speed": 390.0},
-            {"speed": 420.0},
-            {"speed": 450.0},
-            {"speed": 480.0},
-            {"speed": 510.0},
+            {"speed": 382.5},
         ],
     ),
 }

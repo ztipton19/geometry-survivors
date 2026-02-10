@@ -483,14 +483,14 @@ class Game:
         angle = 0.0
         if self.player.body is not None:
             angle = float(self.player.body.angle)
-        triangle = self._get_player_triangle(screen_px, screen_py, angle)
         ship_colors = get_ship_selection_colors()
-        pygame.draw.polygon(self.screen, ship_colors["ship_fill"], triangle, 0)
-        pygame.draw.polygon(self.screen, ship_colors["ship_outline"], triangle, 2)
+        catamaran_polys, front_point = self._get_player_catamaran(screen_px, screen_py, angle)
+        for poly in catamaran_polys:
+            pygame.draw.polygon(self.screen, ship_colors["ship_fill"], poly, 0)
+            pygame.draw.polygon(self.screen, ship_colors["ship_outline"], poly, 2)
 
         # Draw bright front tip glow for directionality
-        # Front tip is the first point in the triangle
-        front_x, front_y = triangle[0]
+        front_x, front_y = front_point
         pygame.draw.circle(self.screen, ship_colors["ship_tip"], (int(front_x), int(front_y)), 3, 0)
         pygame.draw.circle(self.screen, ship_colors["ship_tip"], (int(front_x), int(front_y)), 5, 1)
         
@@ -1075,22 +1075,43 @@ class Game:
         if self.vignette_surface is not None:
             self.screen.blit(self.vignette_surface, (0, 0))
 
-    def _get_player_triangle(self, x: float, y: float, angle: float) -> list[tuple[float, float]]:
-        size = PLAYER_RADIUS + 4
-        # More elongated, arrow-shaped triangle for clearer directionality
-        points = [
-            (0.0, -size * 1.3),  # Front point - extended forward
-            (-size * 0.7, size * 0.8),  # Back left - wider base
-            (size * 0.7, size * 0.8),   # Back right - wider base
-        ]
+    def _get_player_catamaran(
+        self, x: float, y: float, angle: float
+    ) -> tuple[list[list[tuple[float, float]]], tuple[float, float]]:
+        scale = (PLAYER_RADIUS * 2) / 40.0
+        # OBA catamaran hull points (from ship-test.py), facing up
+        left_hull = [(-15, -20), (-7, -20), (-7, 4), (-15, 4)]
+        right_hull = [(7, -20), (15, -20), (15, 4), (7, 4)]
+        base = [(-15, 0), (15, 0), (15, 14), (-15, 14)]
+        left_engine = [(-12, 14), (-8, 14), (-6, 20), (-14, 20)]
+        right_engine = [(8, 14), (12, 14), (14, 20), (6, 20)]
+
         sin_a = math.sin(angle)
         cos_a = math.cos(angle)
-        rotated = []
-        for px, py in points:
-            rx = px * cos_a - py * sin_a
-            ry = px * sin_a + py * cos_a
-            rotated.append((x + rx, y + ry))
-        return rotated
+
+        def _transform(points: list[tuple[float, float]]) -> list[tuple[float, float]]:
+            rotated: list[tuple[float, float]] = []
+            for px, py in points:
+                sx = px * scale
+                sy = py * scale
+                rx = sx * cos_a - sy * sin_a
+                ry = sx * sin_a + sy * cos_a
+                rotated.append((x + rx, y + ry))
+            return rotated
+
+        polys = [
+            _transform(base),
+            _transform(left_hull),
+            _transform(right_hull),
+            _transform(left_engine),
+            _transform(right_engine),
+        ]
+
+        # Front tip glow centered between hulls
+        front_px, front_py = 0.0, -20.0 * scale
+        front_x = x + (front_px * cos_a - front_py * sin_a)
+        front_y = y + (front_px * sin_a + front_py * cos_a)
+        return polys, (front_x, front_y)
 
     def _get_weapon_slots(self) -> list[dict[str, object]]:
         minigun_cd = self.player.get_fire_cooldown()
