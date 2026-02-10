@@ -23,6 +23,7 @@ class Player:
     rockets_level: int = -1  # -1 = not unlocked
     laser_level: int = -1
     emp_level: int = -1
+    mines_level: int = -1
     health_level: int = 0
     shield_level: int = 0
     shield_hp: float = 0.0
@@ -130,3 +131,9 @@ class Player:
     def get_tractor_range(self) -> float:
         values = UPGRADES["tractor"].values[self.tractor_level]
         return float(values["pickup_radius"])
+
+    def get_mine_stats(self) -> dict[str, float]:
+        values = UPGRADES["mines"].values[self.mines_level]
+        return {
+            "drop_cooldown": float(values["drop_cooldown"]),
+        }

@@ -47,6 +47,12 @@ class Upgrade:
             dmg = self.values[level]["damage"]
             radius = self.values[level]["radius"]
             return f"EMP: {dmg} dmg/tick, {radius:.0f}px radius"
+
+        elif self.id == "mines":
+            if self.is_unlockable and level == -1:
+                return "Unlock: Auto-dropping proximity mines"
+            cooldown = self.values[level]["drop_cooldown"]
+            return f"Mines: Drops every {cooldown:.1f}s behind ship"
         
         elif self.id == "health":
             hp = int(self.values[level]["max_hp_increase"])
@@ -137,6 +143,22 @@ UPGRADES: dict[str, Upgrade] = {
             {"damage": 25, "radius": 200},
         ],
     ),
+    "mines": Upgrade(
+        id="mines",
+        name="Proximity Mines",
+        description="Drop explosive mines behind the ship",
+        category="weapon",
+        max_level=5,
+        is_unlockable=True,
+        values=[
+            {"drop_cooldown": 5.0},
+            {"drop_cooldown": 4.5},
+            {"drop_cooldown": 4.05},
+            {"drop_cooldown": 3.64},
+            {"drop_cooldown": 3.28},
+            {"drop_cooldown": 2.95},
+        ],
+    ),
     "health": Upgrade(
         id="health",
         name="Health Boost",
@@ -221,6 +243,10 @@ def get_available_upgrades(player_level: int, unlocked_weapons: set[str]) -> lis
         available.append("laser")
     if player_level >= 7 and "emp" not in unlocked_weapons:
         available.append("emp")
+
+    # Mines can always be offered and scale their drop rate with upgrades
+    available.append("mines")
+
     # Tractor beam upgrades are always available
     available.append("tractor")
 
