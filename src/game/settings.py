@@ -25,7 +25,7 @@ def get_ship_selection_colors() -> dict[str, tuple[int, int, int]]:
         "xp_bar": NEON_YELLOW,
     }
 
-PLAYER_SPEED = 29.7  # Reduced from 396 for slower movement
+PLAYER_SPEED = 37.125  # Reduced from 396 for slower movement
 PLAYER_RADIUS = 12
 PLAYER_MAX_HP = 100
 
@@ -38,7 +38,7 @@ STRAFE_POWER = 42.9  # Balanced speed increase
 MAX_SPEED = 37.5  # Balanced speed increase
 MIN_SPEED = 0  # Can stop completely
 
-FRICTION = 0.92  # Slow natural deceleration
+FRICTION = 0.98  # Slow natural deceleration
 DRIFT_FACTOR = 0.95  # High momentum carry (ice-like)
 
 REVERSE_POWER = 33  # Balanced speed increase
@@ -63,7 +63,7 @@ EMP_PULSE_LIFETIME = 0.25
 FIRE_COOLDOWN_START = 0.14
 FIRE_COOLDOWN_MIN = 0.04
 
-ENEMY_BASE_SPEED = 10.35  # Balanced speed increase
+ENEMY_BASE_SPEED = 12.9375  # Balanced speed increase
 ENEMY_RADIUS = 12
 ENEMY_SPAWN_INTERVAL_START = 0.75
 ENEMY_SPAWN_INTERVAL_MIN = 0.18

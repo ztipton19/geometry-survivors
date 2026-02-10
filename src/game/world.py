@@ -644,6 +644,9 @@ class Game:
                                 self._select_upgrade(i)
                                 break
 
+                if not self.running:
+                    break
+
                 self.update(dt)
                 self.draw()
         finally:
