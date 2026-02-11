@@ -1,4 +1,4 @@
-"""Shared configuration for the Geometry Survivors prototype."""
+"""Shared configuration for the Clone Protocol prototype."""
 
 WIDTH, HEIGHT = 1100, 700
 FPS = 120
