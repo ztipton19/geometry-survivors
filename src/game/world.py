@@ -18,6 +18,7 @@ from game.entities.player import Player
 from game.entities.rocket import Rocket
 from game.entities.xpgem import XPGem
 from game.cutscene import Cutscene
+from game.debug_overlay import DebugOverlay
 from game.input import handle_player_input
 from game.physics import (
     attach_body,
@@ -104,6 +105,7 @@ class Game:
         self.pause_selection = 0
         self.cutscene: Cutscene | None = None
         self.cutscene_font = pygame.font.SysFont("consolas", 24)
+        self.debug_overlay = DebugOverlay(self)
 
         self.background_seed = 1337
         self.star_chunk_size = 500
@@ -144,6 +146,7 @@ class Game:
         self.upgrade_options.clear()
         self.upgrade_resume_grace = 0.0
         self.cutscene = None
+        self.debug_overlay.params["collision_enabled"] = True
 
     def _start_intro_cutscene(self) -> None:
         intro_text = (
@@ -177,6 +180,7 @@ class Game:
             return
 
         handle_player_input(self.player, dt)
+        self.debug_overlay.apply_to_game()
 
         self.spawner.update(dt, self.elapsed, self.enemies, self.player.pos)
         for enemy in self.enemies:
@@ -208,6 +212,8 @@ class Game:
                 target_pos = self._screen_to_world(pygame.mouse.get_pos())
                 self.rockets.append(combat.fire_rocket(self.player, target_pos))
 
+        collisions_enabled = bool(self.debug_overlay.params["collision_enabled"])
+
         if self.player.laser_level >= 0:
             laser_stats = self.player.get_laser_stats()
             self.laser_timer += dt
@@ -226,17 +232,18 @@ class Game:
                 ty = py + ny * length
                 beam = LaserBeam(px, py, tx, ty, LASER_LIFETIME)
                 self.lasers.append(beam)
-                collisions.resolve_laser_hits(
-                    self.player,
-                    self.enemies,
-                    (px, py),
-                    (tx, ty),
-                    laser_stats["damage"],
-                    LASER_WIDTH,
-                    self.xpgems,
-                    death_positions,
-                    hit_positions,
-                )
+                if collisions_enabled:
+                    collisions.resolve_laser_hits(
+                        self.player,
+                        self.enemies,
+                        (px, py),
+                        (tx, ty),
+                        laser_stats["damage"],
+                        LASER_WIDTH,
+                        self.xpgems,
+                        death_positions,
+                        hit_positions,
+                    )
 
         if self.player.emp_level >= 0:
             emp_stats = self.player.get_emp_stats()
@@ -251,19 +258,20 @@ class Game:
                         ttl=EMP_PULSE_LIFETIME,
                     )
                 )
-                for enemy in self.enemies:
-                    if (enemy.x - self.player.x) ** 2 + (enemy.y - self.player.y) ** 2 <= emp_stats[
-                        "radius"
-                    ] ** 2:
-                        collisions.apply_enemy_damage(
-                            enemy,
-                            emp_stats["damage"],
-                            self.player,
-                            self.xpgems,
-                            death_positions,
-                            hit_positions,
-                            (enemy.x, enemy.y),
-                        )
+                if collisions_enabled:
+                    for enemy in self.enemies:
+                        if (enemy.x - self.player.x) ** 2 + (enemy.y - self.player.y) ** 2 <= emp_stats[
+                            "radius"
+                        ] ** 2:
+                            collisions.apply_enemy_damage(
+                                enemy,
+                                emp_stats["damage"],
+                                self.player,
+                                self.xpgems,
+                                death_positions,
+                                hit_positions,
+                                (enemy.x, enemy.y),
+                            )
 
         if self.player.mines_level >= 0:
             mine_stats = self.player.get_mine_stats()
@@ -306,30 +314,31 @@ class Game:
             mine.ttl -= dt
         self.mines = [mine for mine in self.mines if mine.ttl > 0]
 
-        collisions.resolve_bullet_hits(
-            self.bullets,
-            self.enemies,
-            self.player,
-            self.xpgems,
-            death_positions,
-            hit_positions,
-        )
-        collisions.resolve_rocket_hits(
-            self.rockets,
-            self.enemies,
-            self.player,
-            self.xpgems,
-            death_positions,
-            hit_positions,
-        )
-        collisions.resolve_mine_hits(
-            self.mines,
-            self.enemies,
-            self.player,
-            self.xpgems,
-            death_positions,
-            hit_positions,
-        )
+        if collisions_enabled:
+            collisions.resolve_bullet_hits(
+                self.bullets,
+                self.enemies,
+                self.player,
+                self.xpgems,
+                death_positions,
+                hit_positions,
+            )
+            collisions.resolve_rocket_hits(
+                self.rockets,
+                self.enemies,
+                self.player,
+                self.xpgems,
+                death_positions,
+                hit_positions,
+            )
+            collisions.resolve_mine_hits(
+                self.mines,
+                self.enemies,
+                self.player,
+                self.xpgems,
+                death_positions,
+                hit_positions,
+            )
         alive_enemies: list[Enemy] = []
         for enemy in self.enemies:
             if enemy.hp > 0:
@@ -337,7 +346,7 @@ class Game:
             else:
                 remove_body(self.space, enemy)
         self.enemies = alive_enemies
-        total_damage = collisions.resolve_player_hits(self.player, self.enemies, dt)
+        total_damage = collisions.resolve_player_hits(self.player, self.enemies, dt) if collisions_enabled else 0.0
         if total_damage > 0:
             self._add_screen_shake(min(6.0, 2.0 + total_damage * 1.5))
             if self.player.shield_level >= 0:
@@ -586,6 +595,8 @@ class Game:
             draw_pause_menu(self.screen, self.font, self.big_font, self.pause_selection)
         
         draw_end_screen(self.screen, self.font, self.big_font, self.state, self.player)
+        if self.state in ("PLAY", "LEVEL_UP", "PAUSE"):
+            self.debug_overlay.draw(self.screen)
 
         pygame.display.flip()
 
@@ -598,6 +609,11 @@ class Game:
                     if event.type == pygame.QUIT:
                         self.running = False
                     elif event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_F3:
+                            self.debug_overlay.toggle()
+                            continue
+                        if self.state == "PLAY" and self.debug_overlay.handle_input(event):
+                            continue
                         if self.state == "MENU":
                             if event.key in (pygame.K_UP, pygame.K_w):
                                 self.menu_selection = (self.menu_selection - 1) % 3
