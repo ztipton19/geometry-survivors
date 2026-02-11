@@ -7,6 +7,7 @@ from typing import Iterable
 
 import pymunk
 
+from game import settings
 from game.settings import (
     BOOST_DURATION,
     BOOST_FORCE,
@@ -61,16 +62,23 @@ def remove_body(space: pymunk.Space, entity: object) -> None:
     setattr(entity, "shape", None)
 
 
-def apply_rotation(body: pymunk.Body, turn_direction: float, dt: float) -> None:
-    accel = math.radians(ROTATION_ACCEL)
+def apply_rotation(
+    body: pymunk.Body,
+    turn_direction: float,
+    dt: float,
+    rotation_speed: float,
+    rotation_accel: float,
+    drift_factor: float,
+) -> None:
+    accel = math.radians(rotation_accel)
     if turn_direction != 0:
-        target = math.radians(ROTATION_SPEED) * turn_direction
+        target = math.radians(rotation_speed) * turn_direction
         delta = target - body.angular_velocity
         max_change = accel * dt
         delta = max(-max_change, min(max_change, delta))
         body.angular_velocity += delta
     else:
-        body.angular_velocity *= DRIFT_FACTOR
+        body.angular_velocity *= drift_factor
 
 
 def apply_thrust(body: pymunk.Body, power: float) -> None:
@@ -123,7 +131,15 @@ def apply_player_controls(
     body = getattr(player, "body", None)
     if body is None:
         return
-    apply_rotation(body, rotate_direction, dt)
+    drift_factor = float(getattr(player, "debug_drift_factor", DRIFT_FACTOR))
+    apply_rotation(
+        body,
+        rotate_direction,
+        dt,
+        float(getattr(player, "debug_rotation_speed", ROTATION_SPEED)),
+        float(getattr(player, "debug_rotation_accel", ROTATION_ACCEL)),
+        drift_factor,
+    )
     speed_multiplier = 1.0
     if hasattr(player, "get_speed"):
         speed_multiplier = float(player.get_speed()) / PLAYER_SPEED
@@ -143,11 +159,14 @@ def apply_player_controls(
 
     setattr(player, "throttle_level", throttle_level)
 
+    thrust_power = float(getattr(player, "debug_thrust_power", THRUST_POWER))
+    strafe_power = float(getattr(player, "debug_strafe_power", STRAFE_POWER))
+
     if throttle_level > 0:
-        apply_thrust(body, THRUST_POWER * speed_multiplier * throttle_level)
+        apply_thrust(body, thrust_power * speed_multiplier * throttle_level)
 
     if strafe_direction != 0:
-        apply_strafe(body, STRAFE_POWER * speed_multiplier * strafe_direction)
+        apply_strafe(body, strafe_power * speed_multiplier * strafe_direction)
 
     boost_charge = float(getattr(player, "boost_charge", 0.0))
     boost_timer = float(getattr(player, "boost_timer", 0.0))
@@ -213,4 +232,5 @@ def clamp_entity_speeds(player: object, enemies: Iterable[object]) -> None:
     player_body = getattr(player, "body", None)
     if player_body is not None:
         speed_multiplier = float(player.get_speed()) / PLAYER_SPEED
-        clamp_speed(player_body, MAX_SPEED * speed_multiplier)
+        max_speed = float(getattr(player, "debug_max_speed", settings.MAX_SPEED))
+        clamp_speed(player_body, max_speed * speed_multiplier)

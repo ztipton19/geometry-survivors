@@ -12,6 +12,7 @@ PYTHONPATH=src python -m main
 
 - Move: WASD or arrow keys
 - Restart after win/lose: `R`
+- Toggle debug overlay: `F3` (tune movement/combat params live)
 - Quit: `Esc`
 
 ## Requirements
