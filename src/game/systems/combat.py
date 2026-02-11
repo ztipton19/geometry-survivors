@@ -46,25 +46,55 @@ def fire_minigun(player: Player, enemies: list[Enemy]) -> Bullet | None:
     return Bullet(px, py, vx, vy, BULLET_LIFETIME, damage=player.get_bullet_damage())
 
 
-def fire_rocket(player: Player, target_pos: tuple[float, float]) -> Rocket:
+def fire_rocket_salvo(player: Player) -> list[Rocket]:
     px, py = player.pos
-    tx, ty = target_pos
-    dx, dy = tx - px, ty - py
-    nx, ny = norm(dx, dy)
-    vx = nx * ROCKET_SPEED
-    vy = ny * ROCKET_SPEED
+    angle = 0.0
+    if player.body is not None:
+        angle = float(player.body.angle)
+
+    # Match player rendering orientation: angle 0 points ship "front" upward.
+    forward_x = math.sin(angle)
+    forward_y = -math.cos(angle)
+    right_x = -forward_y
+    right_y = forward_x
+
     stats = player.get_rocket_stats()
-    return Rocket(
-        px,
-        py,
-        vx,
-        vy,
-        tx,
-        ty,
-        ROCKET_LIFETIME,
-        damage=stats["damage"],
-        splash_radius=stats["splash_radius"],
-    )
+    rockets: list[Rocket] = []
+
+    missiles_per_rack = max(1, int(stats["missiles_per_rack"]))
+    rack_spacing = 7.0
+    front_offset = 12.0
+    spread_step = 0.09
+    max_target_dist = 1000.0
+
+    for rack_dir in (-1.0, 1.0):
+        spawn_x = px + forward_x * front_offset + right_x * rack_spacing * rack_dir
+        spawn_y = py + forward_y * front_offset + right_y * rack_spacing * rack_dir
+
+        for missile_idx in range(missiles_per_rack):
+            spread_index = missile_idx - (missiles_per_rack - 1) / 2
+            spread_angle = angle + spread_index * spread_step
+            nx = math.sin(spread_angle)
+            ny = -math.cos(spread_angle)
+            vx = nx * ROCKET_SPEED
+            vy = ny * ROCKET_SPEED
+            tx = spawn_x + nx * max_target_dist
+            ty = spawn_y + ny * max_target_dist
+            rockets.append(
+                Rocket(
+                    spawn_x,
+                    spawn_y,
+                    vx,
+                    vy,
+                    tx,
+                    ty,
+                    ROCKET_LIFETIME,
+                    damage=stats["damage"],
+                    splash_radius=stats["splash_radius"],
+                )
+            )
+
+    return rockets
 
 
 def update_bullets(bullets: list[Bullet], dt: float) -> list[Bullet]:

@@ -253,8 +253,7 @@ class Game:
             self.rocket_timer += dt
             while self.rocket_timer >= rocket_stats["fire_cooldown"]:
                 self.rocket_timer -= rocket_stats["fire_cooldown"]
-                target_pos = self._screen_to_world(pygame.mouse.get_pos())
-                self.rockets.append(combat.fire_rocket(self.player, target_pos))
+                self.rockets.extend(combat.fire_rocket_salvo(self.player))
 
         if self.player.laser_level >= 0:
             laser_stats = self.player.get_laser_stats()

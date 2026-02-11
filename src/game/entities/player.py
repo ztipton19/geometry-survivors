@@ -120,6 +120,7 @@ class Player:
             "damage": float(values["damage"]),
             "splash_radius": float(values["splash_radius"]),
             "fire_cooldown": float(values["fire_cooldown"]),
+            "missiles_per_rack": float(values["missiles_per_rack"]),
         }
 
     def get_laser_stats(self) -> dict[str, float]:
