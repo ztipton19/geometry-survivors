@@ -63,7 +63,7 @@ from game.ui import (
 class Game:
     def __init__(self) -> None:
         pygame.init()
-        pygame.display.set_caption("Neon Survivors (prototype)")
+        pygame.display.set_caption("Clone Protocol (prototype)")
         self.fullscreen = False
         self.available_resolutions = [
             ("Default (1100x700)", (settings.WIDTH, settings.HEIGHT)),

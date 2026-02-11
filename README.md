@@ -1,4 +1,4 @@
-# Geometry Survivors
+# Clone Protocol
 
 A neon-flavored top-down survival prototype inspired by arena shooters. The player auto-fires a minigun at the nearest enemy while you dodge swarms for 15 minutes.
 
