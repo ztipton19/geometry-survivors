@@ -15,6 +15,7 @@ from game.entities.emp_pulse import EmpPulse
 from game.entities.laser import LaserBeam
 from game.entities.mine import Mine
 from game.entities.player import Player
+from game.entities.railgun import RailgunSlug
 from game.entities.rocket import Rocket
 from game.entities.xpgem import XPGem
 from game.cutscene import Cutscene
@@ -81,6 +82,7 @@ class Game:
         self.enemies: list[Enemy] = []
         self.bullets: list[Bullet] = []
         self.rockets: list[Rocket] = []
+        self.railgun_shots: list[RailgunSlug] = []
         self.lasers: list[LaserBeam] = []
         self.emp_pulses: list[EmpPulse] = []
         self.mines: list[Mine] = []
@@ -90,6 +92,7 @@ class Game:
         self.fire_timer = 0.0
         self.rocket_timer = 0.0
         self.laser_timer = 0.0
+        self.railgun_timer = 0.0
         self.emp_timer = 0.0
         self.mine_timer = 0.0
         self.shake_timer = 0.0
@@ -127,6 +130,7 @@ class Game:
         self.enemies.clear()
         self.bullets.clear()
         self.rockets.clear()
+        self.railgun_shots.clear()
         self.lasers.clear()
         self.emp_pulses.clear()
         self.mines.clear()
@@ -135,6 +139,7 @@ class Game:
         self.fire_timer = 0.0
         self.rocket_timer = 0.0
         self.laser_timer = 0.0
+        self.railgun_timer = 0.0
         self.emp_timer = 0.0
         self.mine_timer = 0.0
         self.shake_timer = 0.0
@@ -211,6 +216,13 @@ class Game:
                 self.rocket_timer -= rocket_stats["fire_cooldown"]
                 target_pos = self._screen_to_world(pygame.mouse.get_pos())
                 self.rockets.append(combat.fire_rocket(self.player, target_pos))
+
+        if self.player.railgun_level >= 0:
+            railgun_stats = self.player.get_railgun_stats()
+            self.railgun_timer += dt
+            while self.railgun_timer >= railgun_stats["fire_cooldown"]:
+                self.railgun_timer -= railgun_stats["fire_cooldown"]
+                self.railgun_shots.append(combat.fire_railgun(self.player))
 
         collisions_enabled = bool(self.debug_overlay.params["collision_enabled"])
 
@@ -299,6 +311,7 @@ class Game:
 
         combat.update_bullets(self.bullets, dt)
         combat.update_rockets(self.rockets, dt)
+        combat.update_railgun_shots(self.railgun_shots, dt)
         self.bullets = [
             bullet
             for bullet in self.bullets
@@ -308,6 +321,11 @@ class Game:
             rocket
             for rocket in self.rockets
             if rocket.ttl > 0
+        ]
+        self.railgun_shots = [
+            shot
+            for shot in self.railgun_shots
+            if shot.ttl > 0 and self._is_on_screen(shot.x, shot.y, margin=80)
         ]
         self.lasers = [laser for laser in self.lasers if laser.ttl > 0]
         for mine in self.mines:
@@ -325,6 +343,14 @@ class Game:
             )
             collisions.resolve_rocket_hits(
                 self.rockets,
+                self.enemies,
+                self.player,
+                self.xpgems,
+                death_positions,
+                hit_positions,
+            )
+            collisions.resolve_railgun_hits(
+                self.railgun_shots,
                 self.enemies,
                 self.player,
                 self.xpgems,
@@ -493,6 +519,22 @@ class Game:
                 (rocket_x, rocket_y),
                 6,
             )
+
+        for shot in self.railgun_shots:
+            prev_x, prev_y = self._world_to_screen(
+                shot.prev_x, shot.prev_y, cam_x, cam_y, shake_x, shake_y
+            )
+            shot_x, shot_y = self._world_to_screen(
+                shot.x, shot.y, cam_x, cam_y, shake_x, shake_y
+            )
+            pygame.draw.line(
+                self.screen,
+                WHITE,
+                (prev_x, prev_y),
+                (shot_x, shot_y),
+                5,
+            )
+            pygame.draw.circle(self.screen, NEON_CYAN, (shot_x, shot_y), 4, 1)
 
         for laser in self.lasers:
             start_x, start_y = self._world_to_screen(
@@ -1200,6 +1242,11 @@ class Game:
             mine_cd = self.player.get_mine_stats()["drop_cooldown"]
             mine_ratio = min(1.0, self.mine_timer / max(0.0001, mine_cd))
 
+        railgun_ratio = 0.0
+        if self.player.railgun_level >= 0:
+            railgun_cd = self.player.get_railgun_stats()["fire_cooldown"]
+            railgun_ratio = min(1.0, self.railgun_timer / max(0.0001, railgun_cd))
+
         return [
             {
                 "label": "MINIGUN",
@@ -1232,12 +1279,18 @@ class Game:
                 "icon_color": NEON_ORANGE if self.player.mines_level >= 0 else (70, 70, 70),
             },
             {
-                "label": "LOCKED",
-                "type_icon": "",
-                "cooldown_ratio": 0.0,
-                "icon_color": (70, 70, 70),
+                "label": "RAILGUN",
+                "type_icon": "▣",
+                "cooldown_ratio": railgun_ratio,
+                "icon_color": WHITE if self.player.railgun_level >= 0 else (70, 70, 70),
             },
         ]
+
+    def _is_on_screen(self, world_x: float, world_y: float, margin: int = 0) -> bool:
+        cam_x, cam_y = self._get_camera_origin()
+        sx, sy = self._world_to_screen(world_x, world_y, cam_x, cam_y, 0.0, 0.0)
+        width, height = self.screen.get_size()
+        return -margin <= sx <= width + margin and -margin <= sy <= height + margin
 
     def _get_utility_slots(self) -> list[dict[str, object]]:
         hurdle_ratio = 1.0

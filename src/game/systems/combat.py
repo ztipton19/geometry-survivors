@@ -8,8 +8,16 @@ import random
 from game.entities.bullet import Bullet
 from game.entities.enemy import Enemy
 from game.entities.player import Player
+from game.entities.railgun import RailgunSlug
 from game.entities.rocket import Rocket
-from game.settings import BULLET_LIFETIME, BULLET_SPEED, ROCKET_LIFETIME, ROCKET_SPEED
+from game.settings import (
+    BULLET_LIFETIME,
+    BULLET_SPEED,
+    RAILGUN_LIFETIME,
+    RAILGUN_SPEED,
+    ROCKET_LIFETIME,
+    ROCKET_SPEED,
+)
 from game.util import dist2, norm
 
 
@@ -67,6 +75,21 @@ def fire_rocket(player: Player, target_pos: tuple[float, float]) -> Rocket:
     )
 
 
+def fire_railgun(player: Player) -> RailgunSlug:
+    px, py = player.pos
+    angle = 0.0
+    if player.body is not None:
+        angle = float(player.body.angle)
+
+    # Player ship is authored facing up; transform by body angle.
+    nx = math.sin(angle)
+    ny = -math.cos(angle)
+    vx = nx * RAILGUN_SPEED
+    vy = ny * RAILGUN_SPEED
+    stats = player.get_railgun_stats()
+    return RailgunSlug(px, py, vx, vy, RAILGUN_LIFETIME, damage=stats["damage"])
+
+
 def update_bullets(bullets: list[Bullet], dt: float) -> list[Bullet]:
     for bullet in bullets:
         bullet.prev_x = bullet.x
@@ -85,3 +108,13 @@ def update_rockets(rockets: list[Rocket], dt: float) -> list[Rocket]:
         rocket.y += rocket.vy * dt
         rocket.ttl -= dt
     return rockets
+
+
+def update_railgun_shots(shots: list[RailgunSlug], dt: float) -> list[RailgunSlug]:
+    for shot in shots:
+        shot.prev_x = shot.x
+        shot.prev_y = shot.y
+        shot.x += shot.vx * dt
+        shot.y += shot.vy * dt
+        shot.ttl -= dt
+    return shots

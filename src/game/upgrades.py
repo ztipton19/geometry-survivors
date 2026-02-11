@@ -40,6 +40,13 @@ class Upgrade:
             dmg = self.values[level]["damage"]
             cd = self.values[level]["fire_cooldown"]
             return f"Laser: {dmg} dmg, pierces enemies, {cd:.1f}s CD"
+
+        elif self.id == "railgun":
+            if self.is_unlockable and level == -1:
+                return "Unlock: Forward railgun slug"
+            dmg = self.values[level]["damage"]
+            cd = self.values[level]["fire_cooldown"]
+            return f"Railgun: {dmg} dmg, forward-only pierce, {cd:.1f}s CD"
         
         elif self.id == "emp":
             if self.is_unlockable and level == -1:
@@ -125,6 +132,22 @@ UPGRADES: dict[str, Upgrade] = {
             {"damage": 30, "fire_cooldown": 3.5},
             {"damage": 35, "fire_cooldown": 3.0},
             {"damage": 40, "fire_cooldown": 2.5},
+        ],
+    ),
+    "railgun": Upgrade(
+        id="railgun",
+        name="Railgun",
+        description="Massive forward-only piercing slug",
+        category="weapon",
+        max_level=5,
+        is_unlockable=True,
+        values=[
+            {"damage": 120, "fire_cooldown": 7.5},
+            {"damage": 145, "fire_cooldown": 7.0},
+            {"damage": 170, "fire_cooldown": 6.5},
+            {"damage": 195, "fire_cooldown": 6.0},
+            {"damage": 220, "fire_cooldown": 5.5},
+            {"damage": 245, "fire_cooldown": 5.0},
         ],
     ),
     "emp": Upgrade(
@@ -243,6 +266,8 @@ def get_available_upgrades(player_level: int, unlocked_weapons: set[str]) -> lis
         available.append("laser")
     if player_level >= 7 and "emp" not in unlocked_weapons:
         available.append("emp")
+    if player_level >= 9 and "railgun" not in unlocked_weapons:
+        available.append("railgun")
 
     # Mines can always be offered and scale their drop rate with upgrades
     available.append("mines")

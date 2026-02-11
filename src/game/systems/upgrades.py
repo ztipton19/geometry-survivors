@@ -16,6 +16,8 @@ def generate_upgrade_options(player: Player) -> list[str]:
         unlocked_weapons.add("laser")
     if player.emp_level >= 0:
         unlocked_weapons.add("emp")
+    if player.railgun_level >= 0:
+        unlocked_weapons.add("railgun")
     if player.mines_level >= 0:
         unlocked_weapons.add("mines")
     if player.shield_level >= 0:
@@ -62,6 +64,8 @@ def apply_upgrade(player: Player, upgrade_id: str) -> None:
         player.laser_level = new_level
     elif upgrade_id == "emp":
         player.emp_level = new_level
+    elif upgrade_id == "railgun":
+        player.railgun_level = new_level
     elif upgrade_id == "mines":
         player.mines_level = new_level
     elif upgrade_id == "health":

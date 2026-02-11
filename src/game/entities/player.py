@@ -22,6 +22,7 @@ class Player:
     minigun_level: int = 0
     rockets_level: int = -1  # -1 = not unlocked
     laser_level: int = -1
+    railgun_level: int = -1
     emp_level: int = -1
     mines_level: int = -1
     health_level: int = 0
@@ -126,6 +127,13 @@ class Player:
         return {
             "damage": float(values["damage"]),
             "radius": float(values["radius"]),
+        }
+
+    def get_railgun_stats(self) -> dict[str, float]:
+        values = UPGRADES["railgun"].values[self.railgun_level]
+        return {
+            "damage": float(values["damage"]),
+            "fire_cooldown": float(values["fire_cooldown"]),
         }
 
     def get_tractor_range(self) -> float:

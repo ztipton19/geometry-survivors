@@ -5,6 +5,7 @@ from __future__ import annotations
 from game.entities.bullet import Bullet
 from game.entities.enemy import Enemy
 from game.entities.player import Player
+from game.entities.railgun import RailgunSlug
 from game.entities.xpgem import XPGem
 from game.settings import BULLET_RADIUS, PLAYER_RADIUS
 from game.util import dist2, norm, dist_to_segment2
@@ -129,6 +130,36 @@ def resolve_laser_hits(
                 hit_positions,
                 (enemy.x, enemy.y),
             )
+
+
+def resolve_railgun_hits(
+    shots: list[RailgunSlug],
+    enemies: list[Enemy],
+    player: Player,
+    xpgems: list[XPGem],
+    death_positions: list[tuple[float, float]],
+    hit_positions: list[tuple[float, float]],
+) -> None:
+    """Railgun slugs pierce through enemies and keep flying."""
+    trail_width = 7.0
+    for shot in shots:
+        for enemy in enemies:
+            enemy_id = id(enemy)
+            if enemy_id in shot.hit_enemy_ids:
+                continue
+            if dist_to_segment2(enemy.x, enemy.y, shot.prev_x, shot.prev_y, shot.x, shot.y) <= (
+                enemy.radius + trail_width
+            ) ** 2:
+                apply_enemy_damage(
+                    enemy,
+                    shot.damage,
+                    player,
+                    xpgems,
+                    death_positions,
+                    hit_positions,
+                    (enemy.x, enemy.y),
+                )
+                shot.hit_enemy_ids.add(enemy_id)
 
 
 def resolve_mine_hits(
