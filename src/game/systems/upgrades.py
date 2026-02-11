@@ -53,8 +53,8 @@ def apply_upgrade(player: Player, upgrade_id: str) -> None:
     new_level = current_level + 1 if current_level >= 0 else 0
     
     # Get upgrade values for this level
-    if upgrade_id == "minigun":
-        player.minigun_level = new_level
+    if upgrade_id == "mining_laser":
+        player.mining_laser_level = new_level
         # Stats are calculated dynamically from player methods
     elif upgrade_id == "rockets":
         player.rockets_level = new_level

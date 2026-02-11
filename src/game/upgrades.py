@@ -21,10 +21,14 @@ class Upgrade:
         if level >= self.max_level:
             return f"{self.description} (MAXED)"
         
-        if self.id == "minigun":
-            cd = self.values[level]["fire_cooldown"]
-            dmg = self.values[level]["bullet_damage"]
-            return f"Minigun: {cd:.2f}s fire rate, {dmg} damage"
+        if self.id == "mining_laser":
+            acquire_time = self.values[level]["acquire_time"]
+            base_dps = self.values[level]["base_dps"]
+            growth = self.values[level]["dps_growth"]
+            return (
+                f"Mining Laser: {base_dps:.0f} DPS base, +{growth:.0f}/s while locked, "
+                f"{acquire_time:.2f}s lock time"
+            )
         
         elif self.id == "rockets":
             if self.is_unlockable and level == -1:
@@ -80,19 +84,19 @@ class Upgrade:
 
 # Define all upgrades
 UPGRADES: dict[str, Upgrade] = {
-    "minigun": Upgrade(
-        id="minigun",
-        name="Minigun Upgrade",
-        description="Improve minigun fire rate and damage",
+    "mining_laser": Upgrade(
+        id="mining_laser",
+        name="Mining Laser",
+        description="Lock beam that ramps damage over time",
         category="weapon",
         max_level=5,
         values=[
-            {"fire_cooldown": 0.4, "bullet_damage": 10.0},
-            {"fire_cooldown": 0.35, "bullet_damage": 12.0},
-            {"fire_cooldown": 0.3, "bullet_damage": 14.0},
-            {"fire_cooldown": 0.26, "bullet_damage": 16.0},
-            {"fire_cooldown": 0.22, "bullet_damage": 18.0},
-            {"fire_cooldown": 0.18, "bullet_damage": 20.0},
+            {"acquire_time": 0.9, "base_dps": 12.0, "dps_growth": 10.0},
+            {"acquire_time": 0.8, "base_dps": 14.0, "dps_growth": 12.0},
+            {"acquire_time": 0.7, "base_dps": 16.0, "dps_growth": 14.0},
+            {"acquire_time": 0.6, "base_dps": 18.0, "dps_growth": 16.0},
+            {"acquire_time": 0.5, "base_dps": 21.0, "dps_growth": 19.0},
+            {"acquire_time": 0.4, "base_dps": 24.0, "dps_growth": 22.0},
         ],
     ),
     "rockets": Upgrade(
@@ -227,8 +231,8 @@ def get_available_upgrades(player_level: int, unlocked_weapons: set[str]) -> lis
     """Get upgrade IDs that are available for the current state."""
     available = []
     
-    # Always offer minigun upgrades
-    available.append("minigun")
+    # Always offer mining laser upgrades
+    available.append("mining_laser")
     
     # Always offer health upgrades
     available.append("health")

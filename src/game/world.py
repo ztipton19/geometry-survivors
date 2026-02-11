@@ -88,6 +88,9 @@ class Game:
         self.particles: list[Particle] = []
 
         self.fire_timer = 0.0
+        self.mining_laser_target: Enemy | None = None
+        self.mining_laser_acquire_timer = 0.0
+        self.mining_laser_lock_timer = 0.0
         self.rocket_timer = 0.0
         self.laser_timer = 0.0
         self.emp_timer = 0.0
@@ -133,6 +136,9 @@ class Game:
         self.xpgems.clear()
         self.particles.clear()
         self.fire_timer = 0.0
+        self.mining_laser_target = None
+        self.mining_laser_acquire_timer = 0.0
+        self.mining_laser_lock_timer = 0.0
         self.rocket_timer = 0.0
         self.laser_timer = 0.0
         self.emp_timer = 0.0
@@ -194,15 +200,53 @@ class Game:
         death_positions: list[tuple[float, float]] = []
         hit_positions: list[tuple[float, float]] = []
 
-        # Use player's fire cooldown
-        fire_cd = self.player.get_fire_cooldown()
-        self.fire_timer += dt
-        while self.fire_timer >= fire_cd:
-            self.fire_timer -= fire_cd
-            bullet = combat.fire_minigun(self.player, self.enemies)
-            if bullet:
-                self.bullets.append(bullet)
-                self._spawn_muzzle_flash(bullet)
+        collisions_enabled = bool(self.debug_overlay.params["collision_enabled"])
+
+        mining_laser_stats = self.player.get_mining_laser_stats()
+        self.fire_timer = min(
+            mining_laser_stats["acquire_time"],
+            self.mining_laser_acquire_timer,
+        )
+
+        previous_target = self.mining_laser_target
+        if previous_target is not None and previous_target.hp > 0 and previous_target in self.enemies:
+            target = previous_target
+        else:
+            target = combat.nearest_enemy(self.player, self.enemies)
+
+        if target is None:
+            self.mining_laser_target = None
+            self.mining_laser_acquire_timer = 0.0
+            self.mining_laser_lock_timer = 0.0
+        else:
+            if target is not previous_target:
+                self.mining_laser_acquire_timer = 0.0
+                self.mining_laser_lock_timer = 0.0
+            self.mining_laser_target = target
+            self.mining_laser_acquire_timer = min(
+                mining_laser_stats["acquire_time"],
+                self.mining_laser_acquire_timer + dt,
+            )
+            self.fire_timer = self.mining_laser_acquire_timer
+
+            if self.mining_laser_acquire_timer >= mining_laser_stats["acquire_time"]:
+                lock_damage = (
+                    mining_laser_stats["base_dps"]
+                    + mining_laser_stats["dps_growth"] * self.mining_laser_lock_timer
+                ) * dt
+                if collisions_enabled:
+                    collisions.apply_enemy_damage(
+                        target,
+                        lock_damage,
+                        self.player,
+                        self.xpgems,
+                        death_positions,
+                        hit_positions,
+                        (target.x, target.y),
+                    )
+                self.mining_laser_lock_timer += dt
+            else:
+                self.mining_laser_lock_timer = 0.0
 
         if self.player.rockets_level >= 0:
             rocket_stats = self.player.get_rocket_stats()
@@ -211,8 +255,6 @@ class Game:
                 self.rocket_timer -= rocket_stats["fire_cooldown"]
                 target_pos = self._screen_to_world(pygame.mouse.get_pos())
                 self.rockets.append(combat.fire_rocket(self.player, target_pos))
-
-        collisions_enabled = bool(self.debug_overlay.params["collision_enabled"])
 
         if self.player.laser_level >= 0:
             laser_stats = self.player.get_laser_stats()
@@ -493,6 +535,28 @@ class Game:
                 (rocket_x, rocket_y),
                 6,
             )
+
+        if self.mining_laser_target is not None and self.mining_laser_target.hp > 0:
+            start_x, start_y = self._world_to_screen(
+                self.player.x, self.player.y, cam_x, cam_y, shake_x, shake_y
+            )
+            end_x, end_y = self._world_to_screen(
+                self.mining_laser_target.x,
+                self.mining_laser_target.y,
+                cam_x,
+                cam_y,
+                shake_x,
+                shake_y,
+            )
+            acquire_time = max(0.0001, self.player.get_mining_laser_stats()["acquire_time"])
+            lock_ratio = max(0.0, min(1.0, self.mining_laser_acquire_timer / acquire_time))
+            beam_color = (
+                int(80 + 175 * lock_ratio),
+                int(180 + 75 * lock_ratio),
+                int(60 + 195 * lock_ratio),
+            )
+            beam_width = max(2, int(3 + 4 * lock_ratio))
+            pygame.draw.line(self.screen, beam_color, (start_x, start_y), (end_x, end_y), beam_width)
 
         for laser in self.lasers:
             start_x, start_y = self._world_to_screen(
@@ -1178,8 +1242,8 @@ class Game:
         return polys, (front_x, front_y)
 
     def _get_weapon_slots(self) -> list[dict[str, object]]:
-        minigun_cd = self.player.get_fire_cooldown()
-        minigun_ratio = min(1.0, self.fire_timer / max(0.0001, minigun_cd))
+        mining_laser_acquire = self.player.get_fire_cooldown()
+        mining_laser_ratio = min(1.0, self.fire_timer / max(0.0001, mining_laser_acquire))
 
         rocket_ratio = 0.0
         if self.player.rockets_level >= 0:
@@ -1202,9 +1266,9 @@ class Game:
 
         return [
             {
-                "label": "MINIGUN",
-                "type_icon": "◎",
-                "cooldown_ratio": minigun_ratio,
+                "label": "MINING",
+                "type_icon": "◉",
+                "cooldown_ratio": mining_laser_ratio,
                 "icon_color": NEON_YELLOW,
             },
             {
