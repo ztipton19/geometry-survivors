@@ -28,11 +28,12 @@ class Upgrade:
         
         elif self.id == "rockets":
             if self.is_unlockable and level == -1:
-                return "Unlock: Rockets with splash damage"
+                return "Unlock: Dual forward rocket racks"
             dmg = self.values[level]["damage"]
             radius = self.values[level]["splash_radius"]
             cd = self.values[level]["fire_cooldown"]
-            return f"Rockets: {dmg} dmg, {radius:.0f}px splash, {cd:.1f}s CD"
+            missiles = int(self.values[level]["missiles_per_rack"])
+            return f"Rockets: {missiles}x2 missiles, {dmg} dmg, {radius:.0f}px splash, {cd:.1f}s CD"
         
         elif self.id == "laser":
             if self.is_unlockable and level == -1:
@@ -98,17 +99,17 @@ UPGRADES: dict[str, Upgrade] = {
     "rockets": Upgrade(
         id="rockets",
         name="Rockets",
-        description="Homing rockets with splash damage",
+        description="Dual forward rocket racks with splash damage",
         category="weapon",
         max_level=5,
         is_unlockable=True,
         values=[
-            {"damage": 30, "splash_radius": 40, "fire_cooldown": 3.0},
-            {"damage": 35, "splash_radius": 45, "fire_cooldown": 2.8},
-            {"damage": 40, "splash_radius": 50, "fire_cooldown": 2.6},
-            {"damage": 45, "splash_radius": 55, "fire_cooldown": 2.4},
-            {"damage": 50, "splash_radius": 60, "fire_cooldown": 2.2},
-            {"damage": 55, "splash_radius": 65, "fire_cooldown": 2.0},
+            {"damage": 12, "splash_radius": 34, "fire_cooldown": 1.6, "missiles_per_rack": 3},
+            {"damage": 14, "splash_radius": 38, "fire_cooldown": 1.45, "missiles_per_rack": 4},
+            {"damage": 16, "splash_radius": 42, "fire_cooldown": 1.3, "missiles_per_rack": 4},
+            {"damage": 18, "splash_radius": 46, "fire_cooldown": 1.2, "missiles_per_rack": 5},
+            {"damage": 20, "splash_radius": 50, "fire_cooldown": 1.05, "missiles_per_rack": 5},
+            {"damage": 22, "splash_radius": 55, "fire_cooldown": 0.95, "missiles_per_rack": 6},
         ],
     ),
     "laser": Upgrade(
