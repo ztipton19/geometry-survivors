@@ -19,7 +19,7 @@ class Player:
     level: int = 1
     xp_to_next: int = XP_BASE
     # Upgrade tracking
-    minigun_level: int = 0
+    mining_laser_level: int = 0
     rockets_level: int = -1  # -1 = not unlocked
     laser_level: int = -1
     emp_level: int = -1
@@ -99,12 +99,20 @@ class Player:
         return float(values.get("speed", PLAYER_SPEED))
 
     def get_fire_cooldown(self) -> float:
-        values = UPGRADES["minigun"].values[self.minigun_level]
-        return float(values["fire_cooldown"])
+        stats = self.get_mining_laser_stats()
+        return float(stats["acquire_time"])
 
     def get_bullet_damage(self) -> float:
-        values = UPGRADES["minigun"].values[self.minigun_level]
-        return float(values["bullet_damage"])
+        stats = self.get_mining_laser_stats()
+        return float(stats["base_dps"])
+
+    def get_mining_laser_stats(self) -> dict[str, float]:
+        values = UPGRADES["mining_laser"].values[self.mining_laser_level]
+        return {
+            "acquire_time": float(values["acquire_time"]),
+            "base_dps": float(values["base_dps"]),
+            "dps_growth": float(values["dps_growth"]),
+        }
 
     def get_rocket_stats(self) -> dict[str, float]:
         values = UPGRADES["rockets"].values[self.rockets_level]
