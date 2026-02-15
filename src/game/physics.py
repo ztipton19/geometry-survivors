@@ -68,17 +68,13 @@ def apply_rotation(
     dt: float,
     rotation_speed: float,
     rotation_accel: float,
-    drift_factor: float,
 ) -> None:
+    if turn_direction == 0:
+        return
     accel = math.radians(rotation_accel)
-    if turn_direction != 0:
-        target = math.radians(rotation_speed) * turn_direction
-        delta = target - body.angular_velocity
-        max_change = accel * dt
-        delta = max(-max_change, min(max_change, delta))
-        body.angular_velocity += delta
-    else:
-        body.angular_velocity *= drift_factor
+    max_spin = math.radians(rotation_speed)
+    body.angular_velocity += accel * dt * turn_direction
+    body.angular_velocity = max(-max_spin, min(max_spin, body.angular_velocity))
 
 
 def apply_thrust(body: pymunk.Body, power: float) -> None:
@@ -104,9 +100,9 @@ def clamp_speed(body: pymunk.Body, max_speed: float, min_speed: float = MIN_SPEE
 
 
 def apply_drift(body: pymunk.Body) -> None:
-    # Only dampen angular velocity for controllable rotation
-    # Linear velocity is unaffected - true Newtonian space physics
-    body.angular_velocity *= DRIFT_FACTOR
+    # Preserve angular momentum so players must counter-thrust to stop spin.
+    # Linear velocity is also left untouched for Newtonian movement.
+    return
 
 
 def step_space(space: pymunk.Space, dt: float) -> None:
@@ -138,8 +134,8 @@ def apply_player_controls(
         dt,
         float(getattr(player, "debug_rotation_speed", ROTATION_SPEED)),
         float(getattr(player, "debug_rotation_accel", ROTATION_ACCEL)),
-        drift_factor,
     )
+    body.angular_velocity *= max(0.0, min(1.0, drift_factor))
     speed_multiplier = 1.0
     if hasattr(player, "get_speed"):
         speed_multiplier = float(player.get_speed()) / PLAYER_SPEED

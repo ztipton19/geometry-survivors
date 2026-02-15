@@ -39,7 +39,7 @@ MAX_SPEED = 56.25  # Balanced speed increase
 MIN_SPEED = 0  # Can stop completely
 
 FRICTION = 0.98  # Slow natural deceleration
-DRIFT_FACTOR = 0.95  # High momentum carry (ice-like)
+DRIFT_FACTOR = 0.995  # Mild angular drag; spin persists until counter-thrust
 
 REVERSE_POWER = 49.5  # Balanced speed increase
 THROTTLE_STEP_PER_SEC = 0.9
