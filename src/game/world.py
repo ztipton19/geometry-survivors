@@ -201,6 +201,8 @@ class Game:
         hit_positions: list[tuple[float, float]] = []
 
         collisions_enabled = bool(self.debug_overlay.params["collision_enabled"])
+        cam_x, cam_y = self._get_camera_origin()
+        screen_w, screen_h = self.screen.get_size()
 
         mining_laser_stats = self.player.get_mining_laser_stats()
         self.fire_timer = min(
@@ -209,10 +211,34 @@ class Game:
         )
 
         previous_target = self.mining_laser_target
-        if previous_target is not None and previous_target.hp > 0 and previous_target in self.enemies:
+        if (
+            previous_target is not None
+            and previous_target.hp > 0
+            and previous_target in self.enemies
+            and self._is_world_position_on_screen(
+                previous_target.x,
+                previous_target.y,
+                cam_x,
+                cam_y,
+                screen_w,
+                screen_h,
+            )
+        ):
             target = previous_target
         else:
-            target = combat.nearest_enemy(self.player, self.enemies)
+            visible_enemies = [
+                enemy
+                for enemy in self.enemies
+                if self._is_world_position_on_screen(
+                    enemy.x,
+                    enemy.y,
+                    cam_x,
+                    cam_y,
+                    screen_w,
+                    screen_h,
+                )
+            ]
+            target = combat.nearest_enemy(self.player, visible_enemies)
 
         if target is None:
             self.mining_laser_target = None
@@ -1401,6 +1427,19 @@ class Game:
     def _screen_to_world(self, screen_pos: tuple[int, int]) -> tuple[float, float]:
         cam_x, cam_y = self._get_camera_origin()
         return (screen_pos[0] + cam_x, screen_pos[1] + cam_y)
+
+    def _is_world_position_on_screen(
+        self,
+        world_x: float,
+        world_y: float,
+        cam_x: float,
+        cam_y: float,
+        screen_w: int,
+        screen_h: int,
+    ) -> bool:
+        screen_x = world_x - cam_x
+        screen_y = world_y - cam_y
+        return 0.0 <= screen_x <= float(screen_w) and 0.0 <= screen_y <= float(screen_h)
 
     def _get_polygon_points(
         self, x: float, y: float, radius: float, sides: int
