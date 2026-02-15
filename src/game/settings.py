@@ -34,8 +34,8 @@ STRAFE_FUEL_MULT = 0.3
 BOOST_FUEL_MULT = 8.0
 
 # Ship physics tuning (player only - enemies use simple homing)
-ROTATION_SPEED = 150  # deg/sec - lower top spin for control
-ROTATION_ACCEL = 300  # deg/sec^2 - smoother turn buildup
+ROTATION_SPEED = 60  # deg/sec - slow, weighty rotation
+ROTATION_ACCEL = 90  # deg/sec^2 - deliberate turn buildup
 
 THRUST_POWER = 73.125  # Balanced speed increase
 STRAFE_POWER = 64.35  # Balanced speed increase
@@ -43,7 +43,7 @@ MAX_SPEED = 56.25  # Balanced speed increase
 MIN_SPEED = 0  # Can stop completely
 
 FRICTION = 0.98  # Slow natural deceleration
-DRIFT_FACTOR = 0.992  # Slightly stronger angular drag for easier stabilization
+DRIFT_FACTOR = 0.96  # Strong angular drag - rotation feels deliberate, not floaty
 
 REVERSE_POWER = 49.5  # Balanced speed increase
 THROTTLE_STEP_PER_SEC = 0.9
@@ -93,3 +93,10 @@ ROUND_SECONDS = 22 * 60
 DATA_PER_MINUTE = 1.0
 DATA_PER_KILL = 0.2
 DATA_EXTRACT_BONUS = 3.0
+
+# Camera zoom
+ZOOM_DEFAULT = 0.55
+ZOOM_MIN = 0.3
+ZOOM_MAX = 1.0
+ZOOM_STEP = 0.05
+ZOOM_SMOOTH_SPEED = 6.0

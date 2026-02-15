@@ -136,6 +136,8 @@ class Game:
         self.cutscene: Cutscene | None = None
         self.cutscene_font = pygame.font.SysFont("consolas", 24)
         self.debug_overlay = DebugOverlay(self)
+        self.zoom = settings.ZOOM_DEFAULT
+        self.zoom_target = settings.ZOOM_DEFAULT
 
         self.background_seed = 1337
         self.star_chunk_size = 500
@@ -170,6 +172,8 @@ class Game:
         self.run_start_fuel = self.player.fuel
         self.run_start_hp = self.player.hp
         self.cutscene = None
+        self.zoom = settings.ZOOM_DEFAULT
+        self.zoom_target = settings.ZOOM_DEFAULT
         self.debug_overlay.params["collision_enabled"] = True
 
     def _apply_selected_loadout(self) -> None:
@@ -377,7 +381,13 @@ class Game:
         handle_player_input(self.player, dt)
         self.debug_overlay.apply_to_game()
 
-        self.spawner.update(dt, self.elapsed, self.enemies, self.player.pos)
+        # Smooth zoom interpolation
+        if abs(self.zoom - self.zoom_target) > 0.001:
+            self.zoom += (self.zoom_target - self.zoom) * min(1.0, settings.ZOOM_SMOOTH_SPEED * dt)
+        else:
+            self.zoom = self.zoom_target
+
+        self.spawner.update(dt, self.elapsed, self.enemies, self.player.pos, self.zoom)
         for enemy in self.enemies:
             attach_body(self.space, enemy, enemy.radius)
         update_enemy_ai(self.enemies, self.player.pos, dt)
@@ -540,18 +550,19 @@ class Game:
             bullet_x, bullet_y = self._world_to_screen(
                 bullet.x, bullet.y, cam_x, cam_y, shake_x, shake_y
             )
+            bullet_r = max(1, int(BULLET_RADIUS * self.zoom))
             pygame.draw.line(
                 self.screen,
                 NEON_YELLOW,
                 (prev_x, prev_y),
                 (bullet_x, bullet_y),
-                2,
+                max(1, int(2 * self.zoom)),
             )
             pygame.draw.circle(
                 self.screen,
                 NEON_YELLOW,
                 (bullet_x, bullet_y),
-                BULLET_RADIUS,
+                bullet_r,
             )
 
         for enemy in self.enemies:
@@ -579,8 +590,10 @@ class Game:
 
         # Draw bright front tip glow for directionality
         front_x, front_y = front_point
-        pygame.draw.circle(self.screen, ship_colors["ship_tip"], (int(front_x), int(front_y)), 3, 0)
-        pygame.draw.circle(self.screen, ship_colors["ship_tip"], (int(front_x), int(front_y)), 5, 1)
+        tip_r_inner = max(1, int(3 * self.zoom))
+        tip_r_outer = max(2, int(5 * self.zoom))
+        pygame.draw.circle(self.screen, ship_colors["ship_tip"], (int(front_x), int(front_y)), tip_r_inner, 0)
+        pygame.draw.circle(self.screen, ship_colors["ship_tip"], (int(front_x), int(front_y)), tip_r_outer, 1)
 
         self._draw_particles(cam_x, cam_y, shake_x, shake_y)
         self._draw_vignette()
@@ -626,6 +639,13 @@ class Game:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         self.running = False
+                    elif event.type == pygame.MOUSEWHEEL:
+                        if self.state == "PLAY":
+                            self.zoom_target += event.y * settings.ZOOM_STEP
+                            self.zoom_target = max(
+                                settings.ZOOM_MIN,
+                                min(settings.ZOOM_MAX, self.zoom_target),
+                            )
                     elif event.type == pygame.KEYDOWN:
                         if event.key == pygame.K_F3:
                             self.debug_overlay.toggle()
@@ -825,7 +845,7 @@ class Game:
                 self.screen,
                 particle.color,
                 (sx, sy),
-                max(1, int(particle.radius)),
+                max(1, int(particle.radius * self.zoom)),
             )
 
     def _spawn_explosion(
@@ -929,13 +949,15 @@ class Game:
         spacing = 60
         grid_color = (12, 12, 24)
         width, height = self.screen.get_size()
+        view_w = width / self.zoom
+        view_h = height / self.zoom
         start_world_x = int(math.floor(cam_x / spacing) * spacing)
         start_world_y = int(math.floor(cam_y / spacing) * spacing)
-        end_world_x = int(cam_x + width + spacing)
-        end_world_y = int(cam_y + height + spacing)
+        end_world_x = int(cam_x + view_w + spacing)
+        end_world_y = int(cam_y + view_h + spacing)
 
         for world_x in range(start_world_x, end_world_x, spacing):
-            xpos = int(world_x - cam_x + shake_x)
+            xpos = int((world_x - cam_x) * self.zoom + shake_x)
             pygame.draw.line(
                 self.screen,
                 grid_color,
@@ -944,7 +966,7 @@ class Game:
                 1,
             )
         for world_y in range(start_world_y, end_world_y, spacing):
-            ypos = int(world_y - cam_y + shake_y)
+            ypos = int((world_y - cam_y) * self.zoom + shake_y)
             pygame.draw.line(
                 self.screen,
                 grid_color,
@@ -1047,10 +1069,12 @@ class Game:
         self, cam_x: float, cam_y: float, shake_x: float, shake_y: float
     ) -> None:
         width, height = self.screen.get_size()
+        view_w = width / self.zoom
+        view_h = height / self.zoom
         start_chunk_x = int(math.floor(cam_x / self.nebula_chunk_size))
         start_chunk_y = int(math.floor(cam_y / self.nebula_chunk_size))
-        end_chunk_x = int(math.floor((cam_x + width) / self.nebula_chunk_size)) + 1
-        end_chunk_y = int(math.floor((cam_y + height) / self.nebula_chunk_size)) + 1
+        end_chunk_x = int(math.floor((cam_x + view_w) / self.nebula_chunk_size)) + 1
+        end_chunk_y = int(math.floor((cam_y + view_h) / self.nebula_chunk_size)) + 1
 
         for chunk_x in range(start_chunk_x, end_chunk_x):
             for chunk_y in range(start_chunk_y, end_chunk_y):
@@ -1058,26 +1082,32 @@ class Game:
                     nebula_x = float(nebula["x"])
                     nebula_y = float(nebula["y"])
                     radius = int(nebula["radius"])
-                    screen_x = int(nebula_x - cam_x + shake_x)
-                    screen_y = int(nebula_y - cam_y + shake_y)
+                    screen_x = int((nebula_x - cam_x) * self.zoom + shake_x)
+                    screen_y = int((nebula_y - cam_y) * self.zoom + shake_y)
+                    scaled_radius = int(radius * self.zoom)
                     if (
-                        screen_x + radius < 0
-                        or screen_x - radius > width
-                        or screen_y + radius < 0
-                        or screen_y - radius > height
+                        screen_x + scaled_radius < 0
+                        or screen_x - scaled_radius > width
+                        or screen_y + scaled_radius < 0
+                        or screen_y - scaled_radius > height
                     ):
                         continue
                     surface = nebula["surface"]
-                    self.screen.blit(surface, (screen_x - radius, screen_y - radius))
+                    if self.zoom != 1.0:
+                        size = max(1, scaled_radius * 2)
+                        surface = pygame.transform.scale(surface, (size, size))
+                    self.screen.blit(surface, (screen_x - scaled_radius, screen_y - scaled_radius))
 
     def _draw_stars(
         self, cam_x: float, cam_y: float, shake_x: float, shake_y: float
     ) -> None:
         width, height = self.screen.get_size()
+        view_w = width / self.zoom
+        view_h = height / self.zoom
         start_chunk_x = int(math.floor(cam_x / self.star_chunk_size))
         start_chunk_y = int(math.floor(cam_y / self.star_chunk_size))
-        end_chunk_x = int(math.floor((cam_x + width) / self.star_chunk_size)) + 1
-        end_chunk_y = int(math.floor((cam_y + height) / self.star_chunk_size)) + 1
+        end_chunk_x = int(math.floor((cam_x + view_w) / self.star_chunk_size)) + 1
+        end_chunk_y = int(math.floor((cam_y + view_h) / self.star_chunk_size)) + 1
         time_seconds = pygame.time.get_ticks() / 1000.0
 
         for chunk_x in range(start_chunk_x, end_chunk_x):
@@ -1085,8 +1115,8 @@ class Game:
                 for star in self._get_star_chunk(chunk_x, chunk_y):
                     world_x = float(star["x"])
                     world_y = float(star["y"])
-                    screen_x = int(world_x - cam_x + shake_x)
-                    screen_y = int(world_y - cam_y + shake_y)
+                    screen_x = int((world_x - cam_x) * self.zoom + shake_x)
+                    screen_y = int((world_y - cam_y) * self.zoom + shake_y)
                     if screen_x < -3 or screen_x > width + 3 or screen_y < -3 or screen_y > height + 3:
                         continue
                     base_brightness = float(star["brightness"])
@@ -1111,25 +1141,27 @@ class Game:
         if random.random() < dt * 0.02:
             cam_x, cam_y = self._get_camera_origin()
             width, height = self.screen.get_size()
+            view_w = width / self.zoom
+            view_h = height / self.zoom
             edge = random.choice(["left", "right", "top", "bottom"])
             if edge == "left":
                 start_x = cam_x - 40
-                start_y = cam_y + random.uniform(0, height)
+                start_y = cam_y + random.uniform(0, view_h)
                 vx = random.uniform(120, 180)
                 vy = random.uniform(-30, 30)
             elif edge == "right":
-                start_x = cam_x + width + 40
-                start_y = cam_y + random.uniform(0, height)
+                start_x = cam_x + view_w + 40
+                start_y = cam_y + random.uniform(0, view_h)
                 vx = random.uniform(-180, -120)
                 vy = random.uniform(-30, 30)
             elif edge == "top":
-                start_x = cam_x + random.uniform(0, width)
+                start_x = cam_x + random.uniform(0, view_w)
                 start_y = cam_y - 40
                 vx = random.uniform(-60, 60)
                 vy = random.uniform(120, 180)
             else:
-                start_x = cam_x + random.uniform(0, width)
-                start_y = cam_y + height + 40
+                start_x = cam_x + random.uniform(0, view_w)
+                start_y = cam_y + view_h + 40
                 vx = random.uniform(-60, 60)
                 vy = random.uniform(-180, -120)
             self.shooting_stars.append(
@@ -1149,13 +1181,13 @@ class Game:
             return
         width, height = self.screen.get_size()
         for star in self.shooting_stars:
-            screen_x = int(star["x"] - cam_x + shake_x)
-            screen_y = int(star["y"] - cam_y + shake_y)
+            screen_x = int((star["x"] - cam_x) * self.zoom + shake_x)
+            screen_y = int((star["y"] - cam_y) * self.zoom + shake_y)
             if screen_x < -100 or screen_x > width + 100 or screen_y < -100 or screen_y > height + 100:
                 continue
             vx = star["vx"]
             vy = star["vy"]
-            length = 40
+            length = 40 * self.zoom
             mag = math.hypot(vx, vy)
             if mag == 0:
                 continue
@@ -1184,7 +1216,7 @@ class Game:
     def _get_player_catamaran(
         self, x: float, y: float, angle: float
     ) -> tuple[list[list[tuple[float, float]]], tuple[float, float]]:
-        scale = (PLAYER_RADIUS * 2) / 40.0
+        scale = (PLAYER_RADIUS * 2) / 40.0 * self.zoom
         # OBA catamaran hull points (from ship-test.py), facing up
         left_hull = [(-15, -20), (-7, -20), (-7, 4), (-15, 4)]
         right_hull = [(7, -20), (15, -20), (15, 4), (7, 4)]
@@ -1225,32 +1257,37 @@ class Game:
         ex, ey = self._world_to_screen(enemy.x, enemy.y, cam_x, cam_y, shake_x, shake_y)
         outline_color = NEON_MAGENTA if enemy.is_boss else WHITE
         fill_color = (80, 0, 80) if enemy.is_boss else (180, 180, 180)
+        scaled_radius = enemy.radius * self.zoom
 
         if enemy.sides <= 1:
             pygame.draw.circle(
                 self.screen,
                 outline_color,
                 (int(ex), int(ey)),
-                int(enemy.radius),
-                2,
+                max(1, int(scaled_radius)),
+                max(1, int(2 * self.zoom)),
             )
             pygame.draw.circle(
                 self.screen,
                 fill_color,
                 (int(ex), int(ey)),
-                max(1, int(enemy.radius - 3)),
+                max(1, int(scaled_radius - 3 * self.zoom)),
                 0,
             )
             return
 
-        points = self._get_polygon_points(ex, ey, enemy.radius, enemy.sides)
-        inner_points = self._get_polygon_points(ex, ey, max(1.0, enemy.radius - 3), enemy.sides)
+        points = self._get_polygon_points(ex, ey, scaled_radius, enemy.sides)
+        inner_points = self._get_polygon_points(ex, ey, max(1.0, scaled_radius - 3 * self.zoom), enemy.sides)
         pygame.draw.polygon(self.screen, outline_color, points, 2)
         pygame.draw.polygon(self.screen, fill_color, inner_points, 0)
 
     def _get_camera_origin(self) -> tuple[float, float]:
         width, height = self.screen.get_size()
-        return (self.player.x - width / 2.0, self.player.y - height / 2.0)
+        # Camera origin accounts for zoom: we see more world when zoomed out
+        return (
+            self.player.x - width / (2.0 * self.zoom),
+            self.player.y - height / (2.0 * self.zoom),
+        )
 
     def _world_to_screen(
         self,
@@ -1262,13 +1299,13 @@ class Game:
         shake_y: float = 0.0,
     ) -> tuple[int, int]:
         return (
-            int(world_x - cam_x + shake_x),
-            int(world_y - cam_y + shake_y),
+            int((world_x - cam_x) * self.zoom + shake_x),
+            int((world_y - cam_y) * self.zoom + shake_y),
         )
 
     def _screen_to_world(self, screen_pos: tuple[int, int]) -> tuple[float, float]:
         cam_x, cam_y = self._get_camera_origin()
-        return (screen_pos[0] + cam_x, screen_pos[1] + cam_y)
+        return (screen_pos[0] / self.zoom + cam_x, screen_pos[1] / self.zoom + cam_y)
 
     def _is_world_position_on_screen(
         self,
@@ -1279,8 +1316,8 @@ class Game:
         screen_w: int,
         screen_h: int,
     ) -> bool:
-        screen_x = world_x - cam_x
-        screen_y = world_y - cam_y
+        screen_x = (world_x - cam_x) * self.zoom
+        screen_y = (world_y - cam_y) * self.zoom
         return 0.0 <= screen_x <= float(screen_w) and 0.0 <= screen_y <= float(screen_h)
 
     def _get_polygon_points(

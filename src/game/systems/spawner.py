@@ -76,6 +76,7 @@ class Spawner:
         elapsed: float,
         enemies: list[Enemy],
         player_pos: tuple[float, float],
+        zoom: float = 1.0,
     ) -> None:
         if len(enemies) >= self.max_enemies:
             return
@@ -87,7 +88,7 @@ class Spawner:
             if len(enemies) >= self.max_enemies:
                 break
             enemies.append(
-                self._spawn_enemy(player_pos, active_sectors, profile_weights)
+                self._spawn_enemy(player_pos, active_sectors, profile_weights, zoom)
             )
 
     def _spawn_enemy(
@@ -95,9 +96,11 @@ class Spawner:
         player_pos: tuple[float, float],
         active_sectors: int,
         profile_weights: list[tuple[str, float]],
+        zoom: float = 1.0,
     ) -> Enemy:
         px, py = player_pos
-        view_radius = max(settings.WIDTH, settings.HEIGHT) * 0.70
+        # At lower zoom the player sees more, so spawn further out
+        view_radius = max(settings.WIDTH, settings.HEIGHT) * 0.70 / zoom
         margin = 180
         distance = view_radius + margin
 
