@@ -1,4 +1,4 @@
-"""Combat systems for bullets and auto-fire."""
+"""Combat systems for manual fire weapons and projectiles."""
 
 from __future__ import annotations
 
@@ -6,95 +6,112 @@ import math
 import random
 
 from game.entities.bullet import Bullet
-from game.entities.enemy import Enemy
 from game.entities.player import Player
-from game.entities.rocket import Rocket
-from game.settings import BULLET_LIFETIME, BULLET_SPEED, ROCKET_LIFETIME, ROCKET_SPEED
-from game.util import dist2, norm
+from game.entities.weapon_state import WeaponState
+from game.settings import BULLET_LIFETIME, BULLET_SPEED, PLAYER_RADIUS
 
 
-def nearest_enemy(player: Player, enemies: list[Enemy]) -> Enemy | None:
-    if not enemies:
+def _wrap_angle(angle: float) -> float:
+    while angle <= -math.pi:
+        angle += math.tau
+    while angle > math.pi:
+        angle -= math.tau
+    return angle
+
+
+def _vector_to_ship_angle(dx: float, dy: float) -> float:
+    # Convert world vector to ship-angle convention where angle=0 points up.
+    return math.atan2(dx, -dy)
+
+
+def _compute_mount_base_angle(
+    player_angle: float,
+    weapon: WeaponState,
+    aim_world_pos: tuple[float, float] | None,
+    player_pos: tuple[float, float],
+) -> float:
+    mounting = weapon.mounting.lower()
+    if mounting == "rear":
+        return player_angle + math.pi
+    if mounting == "side":
+        if aim_world_pos is not None:
+            px, py = player_pos
+            ax, ay = aim_world_pos
+            to_aim_x = ax - px
+            to_aim_y = ay - py
+            if abs(to_aim_x) > 1e-4 or abs(to_aim_y) > 1e-4:
+                right_x = math.cos(player_angle)
+                right_y = math.sin(player_angle)
+                dot = right_x * to_aim_x + right_y * to_aim_y
+                weapon.side_sign = 1 if dot >= 0 else -1
+        return player_angle + weapon.side_sign * (math.pi / 2)
+    if mounting == "turret" and aim_world_pos is not None:
+        px, py = player_pos
+        ax, ay = aim_world_pos
+        dx = ax - px
+        dy = ay - py
+        if abs(dx) > 1e-4 or abs(dy) > 1e-4:
+            return _vector_to_ship_angle(dx, dy)
+    return player_angle
+
+
+def fire_weapon(
+    player: Player,
+    weapon: WeaponState,
+    aim_world_pos: tuple[float, float] | None = None,
+) -> Bullet | None:
+    if player.body is None:
         return None
-    px, py = player.pos
-    best = None
-    best_d2 = float("inf")
-    for enemy in enemies:
-        d2 = dist2(px, py, enemy.x, enemy.y)
-        if d2 < best_d2:
-            best = enemy
-            best_d2 = d2
-    return best
-
-
-def fire_minigun(player: Player, enemies: list[Enemy]) -> Bullet | None:
-    target = nearest_enemy(player, enemies)
-    if target is None:
+    if not weapon.try_fire():
         return None
 
+    base_angle = _compute_mount_base_angle(
+        float(player.body.angle),
+        weapon,
+        aim_world_pos,
+        player.pos,
+    )
+    spread_radians = math.radians(weapon.gimbal_degrees)
+
+    shot_angle = base_angle
+    if aim_world_pos is not None:
+        px, py = player.pos
+        ax, ay = aim_world_pos
+        aim_dx = ax - px
+        aim_dy = ay - py
+        if abs(aim_dx) > 1e-4 or abs(aim_dy) > 1e-4:
+            aim_angle = _vector_to_ship_angle(aim_dx, aim_dy)
+            delta = _wrap_angle(aim_angle - base_angle)
+            delta = max(-spread_radians, min(spread_radians, delta))
+            shot_angle = base_angle + delta
+    else:
+        shot_angle = base_angle + random.uniform(-spread_radians, spread_radians)
+
+    forward_x = math.sin(shot_angle)
+    forward_y = -math.cos(shot_angle)
+    mounting = weapon.mounting.lower()
+    side_offset = 0.0
+    rear_offset = 0.0
+    if mounting == "side":
+        side_offset = 8.0 * weapon.side_sign
+    elif mounting == "rear":
+        rear_offset = -6.0
+    spawn_distance = PLAYER_RADIUS + 8.0 + rear_offset
     px, py = player.pos
-    tx, ty = target.pos
-    dx, dy = tx - px, ty - py
-    nx, ny = norm(dx, dy)
-
-    spread = 0.08
-    ang = math.atan2(ny, nx) + random.uniform(-spread, spread)
-    vx = math.cos(ang) * BULLET_SPEED
-    vy = math.sin(ang) * BULLET_SPEED
-
-    # Use player's bullet damage
-    return Bullet(px, py, vx, vy, BULLET_LIFETIME, damage=player.get_bullet_damage())
-
-
-def fire_rocket_salvo(player: Player) -> list[Rocket]:
-    px, py = player.pos
-    angle = 0.0
-    if player.body is not None:
-        angle = float(player.body.angle)
-
-    # Match player rendering orientation: angle 0 points ship "front" upward.
-    forward_x = math.sin(angle)
-    forward_y = -math.cos(angle)
-    right_x = -forward_y
-    right_y = forward_x
-
-    stats = player.get_rocket_stats()
-    rockets: list[Rocket] = []
-
-    missiles_per_rack = max(1, int(stats["missiles_per_rack"]))
-    rack_spacing = 7.0
-    front_offset = 12.0
-    spread_step = 0.09
-    max_target_dist = 1000.0
-
-    for rack_dir in (-1.0, 1.0):
-        spawn_x = px + forward_x * front_offset + right_x * rack_spacing * rack_dir
-        spawn_y = py + forward_y * front_offset + right_y * rack_spacing * rack_dir
-
-        for missile_idx in range(missiles_per_rack):
-            spread_index = missile_idx - (missiles_per_rack - 1) / 2
-            spread_angle = angle + spread_index * spread_step
-            nx = math.sin(spread_angle)
-            ny = -math.cos(spread_angle)
-            vx = nx * ROCKET_SPEED
-            vy = ny * ROCKET_SPEED
-            tx = spawn_x + nx * max_target_dist
-            ty = spawn_y + ny * max_target_dist
-            rockets.append(
-                Rocket(
-                    spawn_x,
-                    spawn_y,
-                    vx,
-                    vy,
-                    tx,
-                    ty,
-                    ROCKET_LIFETIME,
-                    damage=stats["damage"],
-                    splash_radius=stats["splash_radius"],
-                )
-            )
-
-    return rockets
+    right_x = math.cos(float(player.body.angle))
+    right_y = math.sin(float(player.body.angle))
+    bullet_x = px + forward_x * spawn_distance + right_x * side_offset
+    bullet_y = py + forward_y * spawn_distance + right_y * side_offset
+    bullet_vx = forward_x * BULLET_SPEED
+    bullet_vy = forward_y * BULLET_SPEED
+    return Bullet(
+        bullet_x,
+        bullet_y,
+        bullet_vx,
+        bullet_vy,
+        BULLET_LIFETIME,
+        damage=weapon.damage,
+    )
 
 
 def update_bullets(bullets: list[Bullet], dt: float) -> list[Bullet]:
@@ -105,13 +122,3 @@ def update_bullets(bullets: list[Bullet], dt: float) -> list[Bullet]:
         bullet.y += bullet.vy * dt
         bullet.ttl -= dt
     return bullets
-
-
-def update_rockets(rockets: list[Rocket], dt: float) -> list[Rocket]:
-    for rocket in rockets:
-        rocket.prev_x = rocket.x
-        rocket.prev_y = rocket.y
-        rocket.x += rocket.vx * dt
-        rocket.y += rocket.vy * dt
-        rocket.ttl -= dt
-    return rockets

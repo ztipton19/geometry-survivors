@@ -1,0 +1,18 @@
+{
+  "meta": {
+    "total_runs": 1,
+    "total_data_gb": 0.08,
+    "best_time_seconds": 5.000000000000038,
+    "total_kills": 0,
+    "total_fuel_burned": 0.0,
+    "total_ammo_spent": 0
+  },
+  "unlocks": {
+    "modules": [
+      "pdc_array",
+      "railgun_mk1",
+      "light_armor",
+      "standard_fuel_tank"
+    ]
+  }
+}

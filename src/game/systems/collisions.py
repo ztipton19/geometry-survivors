@@ -5,7 +5,6 @@ from __future__ import annotations
 from game.entities.bullet import Bullet
 from game.entities.enemy import Enemy
 from game.entities.player import Player
-from game.entities.xpgem import XPGem
 from game.settings import BULLET_RADIUS, PLAYER_RADIUS
 from game.util import dist2, norm, dist_to_segment2
 
@@ -23,11 +22,10 @@ def resolve_bullet_hits(
     bullets: list[Bullet],
     enemies: list[Enemy],
     player: Player,
-    xpgems: list[XPGem],
     death_positions: list[tuple[float, float]],
     hit_positions: list[tuple[float, float]],
 ) -> None:
-    """Handle bullet collisions and spawn XP gems for killed enemies."""
+    """Handle bullet collisions and apply damage."""
     for bullet in bullets:
         for enemy in enemies:
             if dist2(bullet.x, bullet.y, enemy.x, enemy.y) <= (
@@ -37,7 +35,6 @@ def resolve_bullet_hits(
                     enemy,
                     bullet.damage,
                     player,
-                    xpgems,
                     death_positions,
                     hit_positions,
                     (bullet.x, bullet.y),
@@ -51,7 +48,6 @@ def apply_enemy_damage(
     enemy: Enemy,
     damage: float,
     player: Player,
-    xpgems: list[XPGem],
     death_positions: list[tuple[float, float]],
     hit_positions: list[tuple[float, float]],
     hit_pos: tuple[float, float],
@@ -64,7 +60,6 @@ def apply_enemy_damage(
 
     if enemy.hp <= 0:
         player.enemies_killed += 1
-        xpgems.append(XPGem(x=enemy.x, y=enemy.y, value=enemy.xp_value))
         death_positions.append((enemy.x, enemy.y))
 
 
@@ -72,7 +67,6 @@ def resolve_rocket_hits(
     rockets: list,
     enemies: list[Enemy],
     player: Player,
-    xpgems: list[XPGem],
     death_positions: list[tuple[float, float]],
     hit_positions: list[tuple[float, float]],
 ) -> None:
@@ -95,7 +89,6 @@ def resolve_rocket_hits(
                         enemy,
                         rocket.damage,
                         player,
-                        xpgems,
                         death_positions,
                         hit_positions,
                         (rocket.x, rocket.y),
@@ -110,7 +103,6 @@ def resolve_laser_hits(
     end: tuple[float, float],
     damage: float,
     width: float,
-    xpgems: list[XPGem],
     death_positions: list[tuple[float, float]],
     hit_positions: list[tuple[float, float]],
 ) -> None:
@@ -124,7 +116,6 @@ def resolve_laser_hits(
                 enemy,
                 damage,
                 player,
-                xpgems,
                 death_positions,
                 hit_positions,
                 (enemy.x, enemy.y),
@@ -135,7 +126,6 @@ def resolve_mine_hits(
     mines: list,
     enemies: list[Enemy],
     player: Player,
-    xpgems: list[XPGem],
     death_positions: list[tuple[float, float]],
     hit_positions: list[tuple[float, float]],
 ) -> None:
@@ -155,7 +145,6 @@ def resolve_mine_hits(
                     enemy,
                     mine.damage,
                     player,
-                    xpgems,
                     death_positions,
                     hit_positions,
                     (mine.x, mine.y),
@@ -164,7 +153,7 @@ def resolve_mine_hits(
 
 
 def resolve_player_hits(player: Player, enemies: list[Enemy], dt: float) -> float:
-    """Handle enemy-player collisions, with shield damage absorption."""
+    """Handle enemy-player collisions."""
     px, py = player.pos
     total_damage = 0.0
     
@@ -173,15 +162,6 @@ def resolve_player_hits(player: Player, enemies: list[Enemy], dt: float) -> floa
             damage = enemy.damage * dt
             total_damage += damage
             
-            # Shield absorbs damage first
-            if player.shield_level >= 0 and player.shield_hp > 0:
-                if player.shield_hp >= damage:
-                    player.shield_hp -= damage
-                else:
-                    remaining = damage - player.shield_hp
-                    player.shield_hp = 0
-                    player.hp -= remaining
-            else:
-                player.hp -= damage
+            player.hp -= damage
 
     return total_damage

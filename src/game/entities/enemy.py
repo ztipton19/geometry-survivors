@@ -14,10 +14,11 @@ class Enemy:
     speed: float
     hp: float
     damage: float
-    xp_value: int
     sides: int = 1
     radius: float = 12.0
     is_boss: bool = False
+    behavior: str = "rush"
+    preferred_range: float = 240.0
     body: pymunk.Body | None = None
     shape: pymunk.Shape | None = None
 

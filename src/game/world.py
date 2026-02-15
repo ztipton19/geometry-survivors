@@ -11,12 +11,8 @@ from game import assets, settings
 from game.entities.bullet import Bullet
 from game.entities.enemy import Enemy
 from game.entities.particle import Particle
-from game.entities.emp_pulse import EmpPulse
-from game.entities.laser import LaserBeam
-from game.entities.mine import Mine
 from game.entities.player import Player
-from game.entities.rocket import Rocket
-from game.entities.xpgem import XPGem
+from game.entities.weapon_state import WeaponState
 from game.cutscene import Cutscene
 from game.debug_overlay import DebugOverlay
 from game.input import handle_player_input
@@ -32,28 +28,36 @@ from game.physics import (
 from game.settings import (
     BG,
     BULLET_RADIUS,
-    EMP_PULSE_LIFETIME,
     FPS,
-    LASER_LIFETIME,
-    LASER_WIDTH,
-    HURDLE_COOLDOWN,
     NEON_BLUE,
-    NEON_CYAN,
-    NEON_GREEN,
     NEON_MAGENTA,
-    NEON_ORANGE,
     NEON_YELLOW,
     PLAYER_RADIUS,
     RED,
     WHITE,
+    EXTRACTION_AVAILABLE_AT,
+    EXTRACTION_CHANNEL_TIME,
+    DATA_PER_MINUTE,
+    DATA_PER_KILL,
+    DATA_EXTRACT_BONUS,
     get_ship_selection_colors,
 )
-from game.systems import collisions, combat, progression, spawner, upgrades, xp
+from game.systems import (
+    collisions,
+    combat,
+    fitting,
+    progression,
+    save_system,
+    spawner,
+    telemetry,
+    threat_board,
+)
 from game.ui import (
+    draw_data_archive_screen,
+    draw_debrief_screen,
     draw_end_screen,
+    draw_fitting_screen,
     draw_hud,
-    get_level_up_card_rects,
-    draw_level_up_screen,
     draw_options_menu,
     draw_pause_menu,
     draw_start_menu,
@@ -80,21 +84,26 @@ class Game:
         attach_body(self.space, self.player, PLAYER_RADIUS)
         self.enemies: list[Enemy] = []
         self.bullets: list[Bullet] = []
-        self.rockets: list[Rocket] = []
-        self.lasers: list[LaserBeam] = []
-        self.emp_pulses: list[EmpPulse] = []
-        self.mines: list[Mine] = []
-        self.xpgems: list[XPGem] = []
         self.particles: list[Particle] = []
+        self.primary_weapon = WeaponState(
+            name="PDC",
+            ammo_max=1,
+            ammo_current=1,
+            damage=settings.BULLET_DAMAGE,
+            fire_rate=1.0,
+            gimbal_degrees=15.0,
+            mounting="forward",
+        )
+        self.secondary_weapon = WeaponState(
+            name="RAIL",
+            ammo_max=1,
+            ammo_current=1,
+            damage=100.0,
+            fire_rate=0.5,
+            gimbal_degrees=5.0,
+            mounting="forward",
+        )
 
-        self.fire_timer = 0.0
-        self.mining_laser_target: Enemy | None = None
-        self.mining_laser_acquire_timer = 0.0
-        self.mining_laser_lock_timer = 0.0
-        self.rocket_timer = 0.0
-        self.laser_timer = 0.0
-        self.emp_timer = 0.0
-        self.mine_timer = 0.0
         self.shake_timer = 0.0
         self.shake_strength = 0.0
 
@@ -106,6 +115,24 @@ class Game:
         self.menu_selection = 0
         self.options_selection = 0
         self.pause_selection = 0
+        self.selected_weapon_group = 3
+        self.extraction_active = False
+        self.extraction_timer = 0.0
+        self.show_threat_board = False
+        self.current_threats: list[dict[str, object]] = []
+        self.debrief_summary: dict[str, object] = {}
+        self.save_data = save_system.load_save_data()
+        self.modules = fitting.load_modules()
+        self.ships = fitting.load_ships()
+        self.selected_ship_id = next(iter(self.ships.keys()), "")
+        self.ship_equipment: dict[str, str] = {}
+        self.fitting_selection = 0
+        self.archive_selection = 0
+        self.run_start_ammo = 0
+        self.run_start_fuel = 0.0
+        self.run_start_hp = 0.0
+        self.fitting_status = ""
+        self.archive_status = ""
         self.cutscene: Cutscene | None = None
         self.cutscene_font = pygame.font.SysFont("consolas", 24)
         self.debug_overlay = DebugOverlay(self)
@@ -118,10 +145,8 @@ class Game:
         self.shooting_stars: list[dict[str, float]] = []
         self.vignette_surface: pygame.Surface | None = None
         self.vignette_size: tuple[int, int] | None = None
-        
-        # Upgrade system
-        self.upgrade_options: list[str] = []
-        self.upgrade_resume_grace = 0.0
+        self._ensure_save_compatibility()
+        self._reset_fitting_state()
 
     def restart(self) -> None:
         self.player = Player(settings.WIDTH / 2, settings.HEIGHT / 2)
@@ -129,30 +154,197 @@ class Game:
         attach_body(self.space, self.player, PLAYER_RADIUS)
         self.enemies.clear()
         self.bullets.clear()
-        self.rockets.clear()
-        self.lasers.clear()
-        self.emp_pulses.clear()
-        self.mines.clear()
-        self.xpgems.clear()
         self.particles.clear()
-        self.fire_timer = 0.0
-        self.mining_laser_target = None
-        self.mining_laser_acquire_timer = 0.0
-        self.mining_laser_lock_timer = 0.0
-        self.rocket_timer = 0.0
-        self.laser_timer = 0.0
-        self.emp_timer = 0.0
-        self.mine_timer = 0.0
+        self._apply_selected_loadout()
         self.shake_timer = 0.0
         self.shake_strength = 0.0
         self.shooting_stars.clear()
         self.spawner.reset()
         self.elapsed, self.remaining = progression.reset_timer()
         self.state = "PLAY"
-        self.upgrade_options.clear()
-        self.upgrade_resume_grace = 0.0
+        self.selected_weapon_group = 3
+        self.extraction_active = False
+        self.extraction_timer = 0.0
+        self.current_threats = []
+        self.run_start_ammo = self.primary_weapon.ammo_current + self.secondary_weapon.ammo_current
+        self.run_start_fuel = self.player.fuel
+        self.run_start_hp = self.player.hp
         self.cutscene = None
         self.debug_overlay.params["collision_enabled"] = True
+
+    def _apply_selected_loadout(self) -> None:
+        ship = self.ships.get(self.selected_ship_id, {})
+        unlocked_module_ids = fitting.get_unlocked_module_ids(self.save_data)
+        self.ship_equipment = fitting.sanitize_equipment(
+            self.ship_equipment,
+            ship,
+            self.modules,
+            unlocked_module_ids,
+        )
+        stats = fitting.calculate_ship_stats(ship, self.modules, self.ship_equipment)
+        self.player.max_fuel = float(stats["fuel"])
+        self.player.fuel = self.player.max_fuel
+        self.player.max_hp = float(stats["hull"])
+        self.player.hp = self.player.max_hp
+        self.player.fuel_rate = float(stats["fuel_rate"])
+        self.player.speed_value = float(stats["speed"])
+
+        slots = ship.get("slots", [])
+        primary_module = self._get_module_for_slot(slots, "weapon_primary")
+        secondary_module = self._get_module_for_slot(slots, "weapon_secondary")
+        self.primary_weapon = self._build_weapon_state(primary_module, "PRIMARY")
+        self.secondary_weapon = self._build_weapon_state(secondary_module, "SECONDARY")
+
+    def _finish_run(self, outcome: str) -> None:
+        survival_time = self.elapsed
+        kills = self.player.enemies_killed
+        ammo_spent = max(
+            0,
+            self.run_start_ammo
+            - (self.primary_weapon.ammo_current + self.secondary_weapon.ammo_current),
+        )
+        fuel_spent = max(0.0, self.run_start_fuel - self.player.fuel)
+        hull_damage_taken = max(0.0, self.run_start_hp - self.player.hp)
+        data_earned = (survival_time / 60.0) * DATA_PER_MINUTE + kills * DATA_PER_KILL
+        if outcome == "Extracted":
+            data_earned += DATA_EXTRACT_BONUS
+        data_earned = round(data_earned, 2)
+
+        meta = self.save_data["meta"]
+        meta["total_runs"] = int(meta.get("total_runs", 0)) + 1
+        meta["total_data_gb"] = round(float(meta.get("total_data_gb", 0.0)) + data_earned, 2)
+        meta["best_time_seconds"] = max(float(meta.get("best_time_seconds", 0.0)), survival_time)
+        meta["total_kills"] = int(meta.get("total_kills", 0)) + kills
+        meta["total_fuel_burned"] = round(float(meta.get("total_fuel_burned", 0.0)) + fuel_spent, 2)
+        meta["total_ammo_spent"] = int(meta.get("total_ammo_spent", 0)) + ammo_spent
+        save_system.save_data(self.save_data)
+
+        self.debrief_summary = {
+            "outcome": outcome,
+            "survival_time": survival_time,
+            "kills": kills,
+            "ammo_spent": ammo_spent,
+            "fuel_spent": fuel_spent,
+            "hull_damage": hull_damage_taken,
+            "data_earned": data_earned,
+            "total_data_gb": meta["total_data_gb"],
+            "clone_number": meta["total_runs"],
+        }
+        telemetry.append_run_telemetry(
+            {
+                "clone_number": meta["total_runs"],
+                "outcome": outcome,
+                "survival_time": round(survival_time, 2),
+                "kills": int(kills),
+                "ammo_spent": int(ammo_spent),
+                "fuel_spent": round(fuel_spent, 2),
+                "hull_damage": round(hull_damage_taken, 2),
+                "data_earned": data_earned,
+                "total_data_gb": meta["total_data_gb"],
+                "primary_weapon": self.primary_weapon.name,
+                "secondary_weapon": self.secondary_weapon.name,
+                "primary_mounting": self.primary_weapon.mounting,
+                "secondary_mounting": self.secondary_weapon.mounting,
+                "ship_id": self.selected_ship_id,
+                "equipment": dict(self.ship_equipment),
+            }
+        )
+        self.state = "DEBRIEF"
+
+    def _ensure_save_compatibility(self) -> None:
+        defaults = save_system.default_save_data()
+        for key, value in defaults.items():
+            if key not in self.save_data:
+                self.save_data[key] = value
+        meta = self.save_data.setdefault("meta", {})
+        for key, value in defaults["meta"].items():
+            meta.setdefault(key, value)
+        unlocks = self.save_data.setdefault("unlocks", {})
+        unlocked_modules = unlocks.setdefault("modules", [])
+        for module_id in defaults["unlocks"]["modules"]:
+            if module_id not in unlocked_modules:
+                unlocked_modules.append(module_id)
+        save_system.save_data(self.save_data)
+
+    def _reset_fitting_state(self) -> None:
+        if not self.selected_ship_id or self.selected_ship_id not in self.ships:
+            self.selected_ship_id = next(iter(self.ships.keys()), "")
+        ship = self.ships.get(self.selected_ship_id, {})
+        unlocked_module_ids = fitting.get_unlocked_module_ids(self.save_data)
+        self.ship_equipment = fitting.default_equipment_for_ship(
+            ship,
+            self.modules,
+            unlocked_module_ids,
+        )
+        self.ship_equipment = fitting.sanitize_equipment(
+            self.ship_equipment,
+            ship,
+            self.modules,
+            unlocked_module_ids,
+        )
+        self.fitting_selection = 0
+
+    def _get_module_for_slot(self, ship_slots: object, slot_id: str) -> dict[str, object]:
+        if not isinstance(ship_slots, list):
+            return {}
+        for slot in ship_slots:
+            if not isinstance(slot, dict):
+                continue
+            if str(slot.get("id")) == slot_id:
+                module_id = self.ship_equipment.get(slot_id)
+                if module_id and module_id in self.modules:
+                    return self.modules[module_id]
+        return {}
+
+    def _build_weapon_state(self, module: dict[str, object], fallback_name: str) -> WeaponState:
+        stats = module.get("stats", {}) if isinstance(module, dict) else {}
+        if not isinstance(stats, dict):
+            stats = {}
+        ammo = max(1, int(stats.get("ammo", 1)))
+        return WeaponState(
+            name=str(module.get("name", fallback_name)),
+            ammo_max=ammo,
+            ammo_current=ammo,
+            damage=float(stats.get("damage", settings.BULLET_DAMAGE)),
+            fire_rate=float(stats.get("fire_rate", 1.0)),
+            gimbal_degrees=float(stats.get("gimbal_degrees", 15.0)),
+            mounting=str(module.get("mounting", "forward")),
+        )
+
+    def _get_fitting_ship_and_stats(self) -> tuple[dict[str, object], dict[str, float | int]]:
+        ship = self.ships.get(self.selected_ship_id, {})
+        stats = fitting.calculate_ship_stats(ship, self.modules, self.ship_equipment)
+        return ship, stats
+
+    def _cycle_slot_module(self, direction: int) -> None:
+        ship = self.ships.get(self.selected_ship_id, {})
+        slots = ship.get("slots", [])
+        if not isinstance(slots, list) or not slots:
+            return
+        slot_index = self.fitting_selection % len(slots)
+        slot = slots[slot_index]
+        if not isinstance(slot, dict):
+            return
+        slot_id = str(slot.get("id", ""))
+        compatible_ids = fitting.compatible_modules_for_slot(
+            self.modules,
+            fitting.get_unlocked_module_ids(self.save_data),
+            slot,
+        )
+        if not compatible_ids:
+            self.fitting_status = "No unlocked modules fit this slot."
+            return
+        current_id = self.ship_equipment.get(slot_id)
+        if current_id not in compatible_ids:
+            self.ship_equipment[slot_id] = compatible_ids[0]
+            module_name = str(self.modules.get(compatible_ids[0], {}).get("name", compatible_ids[0]))
+            self.fitting_status = f"Equipped {module_name}"
+            return
+        current_index = compatible_ids.index(current_id)
+        next_index = (current_index + direction) % len(compatible_ids)
+        self.ship_equipment[slot_id] = compatible_ids[next_index]
+        module_name = str(self.modules.get(compatible_ids[next_index], {}).get("name", compatible_ids[next_index]))
+        self.fitting_status = f"Equipped {module_name}"
 
     def _start_intro_cutscene(self) -> None:
         intro_text = (
@@ -174,15 +366,12 @@ class Game:
             return
         if self.state != "PLAY":
             return
-        if self.upgrade_resume_grace > 0:
-            self.upgrade_resume_grace = max(0.0, self.upgrade_resume_grace - dt)
-            return
 
         self.elapsed, self.remaining, completed = progression.update_timer(
             self.elapsed, self.remaining, dt
         )
         if completed:
-            self.state = "WIN"
+            self._finish_run("Signal Lost")
             return
 
         handle_player_input(self.player, dt)
@@ -196,216 +385,45 @@ class Game:
         clamp_entity_speeds(self.player, self.enemies)
         sync_entity_positions([self.player])
         sync_entity_positions(self.enemies)
+        self.current_threats = threat_board.collect_threats(self.enemies, self.player.pos)
 
         death_positions: list[tuple[float, float]] = []
         hit_positions: list[tuple[float, float]] = []
-
         collisions_enabled = bool(self.debug_overlay.params["collision_enabled"])
-        cam_x, cam_y = self._get_camera_origin()
-        screen_w, screen_h = self.screen.get_size()
+        self.primary_weapon.update(dt)
+        self.secondary_weapon.update(dt)
 
-        mining_laser_stats = self.player.get_mining_laser_stats()
-        self.fire_timer = min(
-            mining_laser_stats["acquire_time"],
-            self.mining_laser_acquire_timer,
-        )
-
-        previous_target = self.mining_laser_target
-        if (
-            previous_target is not None
-            and previous_target.hp > 0
-            and previous_target in self.enemies
-            and self._is_world_position_on_screen(
-                previous_target.x,
-                previous_target.y,
-                cam_x,
-                cam_y,
-                screen_w,
-                screen_h,
-            )
-        ):
-            target = previous_target
+        mouse_buttons = pygame.mouse.get_pressed(3)
+        mouse_world = self._screen_to_world(pygame.mouse.get_pos())
+        if self.selected_weapon_group == 1:
+            primary_enabled = True
+            secondary_enabled = False
+        elif self.selected_weapon_group == 2:
+            primary_enabled = False
+            secondary_enabled = True
         else:
-            visible_enemies = [
-                enemy
-                for enemy in self.enemies
-                if self._is_world_position_on_screen(
-                    enemy.x,
-                    enemy.y,
-                    cam_x,
-                    cam_y,
-                    screen_w,
-                    screen_h,
-                )
-            ]
-            target = combat.nearest_enemy(self.player, visible_enemies)
-
-        if target is None:
-            self.mining_laser_target = None
-            self.mining_laser_acquire_timer = 0.0
-            self.mining_laser_lock_timer = 0.0
-        else:
-            if target is not previous_target:
-                self.mining_laser_acquire_timer = 0.0
-                self.mining_laser_lock_timer = 0.0
-            self.mining_laser_target = target
-            self.mining_laser_acquire_timer = min(
-                mining_laser_stats["acquire_time"],
-                self.mining_laser_acquire_timer + dt,
-            )
-            self.fire_timer = self.mining_laser_acquire_timer
-
-            if self.mining_laser_acquire_timer >= mining_laser_stats["acquire_time"]:
-                lock_damage = (
-                    mining_laser_stats["base_dps"]
-                    + mining_laser_stats["dps_growth"] * self.mining_laser_lock_timer
-                ) * dt
-                if collisions_enabled:
-                    collisions.apply_enemy_damage(
-                        target,
-                        lock_damage,
-                        self.player,
-                        self.xpgems,
-                        death_positions,
-                        hit_positions,
-                        (target.x, target.y),
-                    )
-                self.mining_laser_lock_timer += dt
-            else:
-                self.mining_laser_lock_timer = 0.0
-
-        if self.player.rockets_level >= 0:
-            rocket_stats = self.player.get_rocket_stats()
-            self.rocket_timer += dt
-            while self.rocket_timer >= rocket_stats["fire_cooldown"]:
-                self.rocket_timer -= rocket_stats["fire_cooldown"]
-                self.rockets.extend(combat.fire_rocket_salvo(self.player))
-
-        if self.player.laser_level >= 0:
-            laser_stats = self.player.get_laser_stats()
-            self.laser_timer += dt
-            if self.laser_timer >= laser_stats["fire_cooldown"]:
-                self.laser_timer -= laser_stats["fire_cooldown"]
-                px, py = self.player.pos
-                mx, my = self._screen_to_world(pygame.mouse.get_pos())
-                dx, dy = mx - px, my - py
-                length = max(self.screen.get_width(), self.screen.get_height()) * 1.25
-                if dx == 0 and dy == 0:
-                    nx, ny = (0.0, -1.0)
-                else:
-                    mag = math.hypot(dx, dy)
-                    nx, ny = (dx / mag, dy / mag)
-                tx = px + nx * length
-                ty = py + ny * length
-                beam = LaserBeam(px, py, tx, ty, LASER_LIFETIME)
-                self.lasers.append(beam)
-                if collisions_enabled:
-                    collisions.resolve_laser_hits(
-                        self.player,
-                        self.enemies,
-                        (px, py),
-                        (tx, ty),
-                        laser_stats["damage"],
-                        LASER_WIDTH,
-                        self.xpgems,
-                        death_positions,
-                        hit_positions,
-                    )
-
-        if self.player.emp_level >= 0:
-            emp_stats = self.player.get_emp_stats()
-            self.emp_timer += dt
-            if self.emp_timer >= 0.5:
-                self.emp_timer -= 0.5
-                self.emp_pulses.append(
-                    EmpPulse(
-                        x=self.player.x,
-                        y=self.player.y,
-                        radius=emp_stats["radius"],
-                        ttl=EMP_PULSE_LIFETIME,
-                    )
-                )
-                if collisions_enabled:
-                    for enemy in self.enemies:
-                        if (enemy.x - self.player.x) ** 2 + (enemy.y - self.player.y) ** 2 <= emp_stats[
-                            "radius"
-                        ] ** 2:
-                            collisions.apply_enemy_damage(
-                                enemy,
-                                emp_stats["damage"],
-                                self.player,
-                                self.xpgems,
-                                death_positions,
-                                hit_positions,
-                                (enemy.x, enemy.y),
-                            )
-
-        if self.player.mines_level >= 0:
-            mine_stats = self.player.get_mine_stats()
-            self.mine_timer += dt
-            while self.mine_timer >= mine_stats["drop_cooldown"]:
-                self.mine_timer -= mine_stats["drop_cooldown"]
-                angle = 0.0
-                if self.player.body is not None:
-                    angle = float(self.player.body.angle)
-                drop_distance = PLAYER_RADIUS + 18
-                back_dx = -math.sin(angle)
-                back_dy = math.cos(angle)
-                mine_x = self.player.x + back_dx * drop_distance
-                mine_y = self.player.y + back_dy * drop_distance
-                self.mines.append(
-                    Mine(
-                        x=mine_x,
-                        y=mine_y,
-                        ttl=15.0,
-                        damage=55.0,
-                        splash_radius=80.0,
-                        trigger_radius=24.0,
-                    )
-                )
+            primary_enabled = True
+            secondary_enabled = True
+        if mouse_buttons[0] and primary_enabled:
+            bullet = combat.fire_weapon(self.player, self.primary_weapon, mouse_world)
+            if bullet is not None:
+                self.bullets.append(bullet)
+        if mouse_buttons[2] and secondary_enabled:
+            bullet = combat.fire_weapon(self.player, self.secondary_weapon, mouse_world)
+            if bullet is not None:
+                self.bullets.append(bullet)
 
         combat.update_bullets(self.bullets, dt)
-        combat.update_rockets(self.rockets, dt)
-        self.bullets = [
-            bullet
-            for bullet in self.bullets
-            if bullet.ttl > 0
-        ]
-        self.rockets = [
-            rocket
-            for rocket in self.rockets
-            if rocket.ttl > 0
-        ]
-        self.lasers = [laser for laser in self.lasers if laser.ttl > 0]
-        for mine in self.mines:
-            mine.ttl -= dt
-        self.mines = [mine for mine in self.mines if mine.ttl > 0]
-
+        self.bullets = [bullet for bullet in self.bullets if bullet.ttl > 0]
         if collisions_enabled:
             collisions.resolve_bullet_hits(
                 self.bullets,
                 self.enemies,
                 self.player,
-                self.xpgems,
                 death_positions,
                 hit_positions,
             )
-            collisions.resolve_rocket_hits(
-                self.rockets,
-                self.enemies,
-                self.player,
-                self.xpgems,
-                death_positions,
-                hit_positions,
-            )
-            collisions.resolve_mine_hits(
-                self.mines,
-                self.enemies,
-                self.player,
-                self.xpgems,
-                death_positions,
-                hit_positions,
-            )
+
         alive_enemies: list[Enemy] = []
         for enemy in self.enemies:
             if enemy.hp > 0:
@@ -416,60 +434,34 @@ class Game:
         total_damage = collisions.resolve_player_hits(self.player, self.enemies, dt) if collisions_enabled else 0.0
         if total_damage > 0:
             self._add_screen_shake(min(6.0, 2.0 + total_damage * 1.5))
-            if self.player.shield_level >= 0:
-                self.player.shield_regen_delay = self.player.get_shield_regen_delay()
-
-        if self.player.shield_level >= 0:
-            self.player.shield_max = self.player.get_shield_max()
-            if self.player.shield_hp < self.player.shield_max:
-                if self.player.shield_regen_delay > 0:
-                    self.player.shield_regen_delay = max(
-                        0.0, self.player.shield_regen_delay - dt
-                    )
-                else:
-                    regen_rate = self.player.get_shield_regen_rate()
-                    self.player.shield_hp = min(
-                        self.player.shield_max, self.player.shield_hp + regen_rate * dt
-                    )
-
         for pos in death_positions:
             self._spawn_explosion(pos, RED, 12)
-
         for pos in hit_positions:
             self._spawn_hit_sparks(pos)
 
-        # Update XP gems
-        leveled_up = xp.update_xp_gems(self.xpgems, self.player, dt)
-        
-        # Level up
-        if leveled_up:
-            self.upgrade_options = upgrades.generate_upgrade_options(self.player)
-            if self.upgrade_options:
-                self.state = "LEVEL_UP"
-            else:
-                # No upgrades remain; continue play without opening level-up UI.
-                self.state = "PLAY"
+        if self.elapsed >= EXTRACTION_AVAILABLE_AT:
+            if self.extraction_active:
+                self.extraction_timer = max(0.0, self.extraction_timer - dt)
+                if self.extraction_timer <= 0:
+                    self._finish_run("Extracted")
+                    return
 
         # Check death
         if self.player.hp <= 0:
             self.player.hp = 0
             self._spawn_explosion(self.player.pos, NEON_BLUE, 18)
             self._add_screen_shake(10.0)
-            self.state = "LOSE"
+            self._finish_run("Destroyed")
+            return
 
         self._update_particles(dt)
-        self._spawn_engine_particles()  # Continuous engine thrust particles
-        for laser in self.lasers:
-            laser.ttl -= dt
-        for pulse in self.emp_pulses:
-            pulse.ttl -= dt
-        self.emp_pulses = [pulse for pulse in self.emp_pulses if pulse.ttl > 0]
+        self._spawn_engine_particles()
         if self.shake_timer > 0:
             self.shake_timer = max(0.0, self.shake_timer - dt)
         self._update_shooting_stars(dt)
 
     def draw(self) -> None:
-        if self.state in ("PLAY", "LEVEL_UP", "PAUSE", "WIN", "LOSE"):
+        if self.state in ("PLAY", "PAUSE", "WIN", "LOSE", "DEBRIEF"):
             shake_x, shake_y = self._get_shake_offset()
             cam_x, cam_y = self._get_camera_origin()
         else:
@@ -480,6 +472,24 @@ class Game:
 
         if self.state == "MENU":
             draw_start_menu(self.screen, self.font, self.big_font, self.menu_selection)
+            pygame.display.flip()
+            return
+        if self.state == "FITTING":
+            ship, fitting_stats = self._get_fitting_ship_and_stats()
+            unlocked_module_ids = fitting.get_unlocked_module_ids(self.save_data)
+            draw_fitting_screen(
+                self.screen,
+                self.font,
+                self.big_font,
+                ship,
+                self.modules,
+                self.ship_equipment,
+                self.fitting_selection,
+                fitting_stats,
+                float(self.save_data["meta"].get("total_data_gb", 0.0)),
+                unlocked_module_ids,
+                self.fitting_status,
+            )
             pygame.display.flip()
             return
         if self.state == "OPTIONS":
@@ -498,26 +508,30 @@ class Game:
             self.cutscene.draw(self.screen, self.cutscene_font)
             pygame.display.flip()
             return
-
-        # Draw XP gems
-        for gem in self.xpgems:
-            # Pulse effect
-            pulse = int(5 * (1 + 0.3 * (gem.x % 100) / 100))
-            gx, gy = self._world_to_screen(gem.x, gem.y, cam_x, cam_y, shake_x, shake_y)
-            pygame.draw.circle(
-                self.screen,
-                NEON_GREEN,
-                (gx, gy),
-                pulse,
-                0,
+        if self.state == "ARCHIVE":
+            entries = fitting.build_archive_entries(
+                self.modules,
+                fitting.get_unlocked_module_ids(self.save_data),
             )
-            pygame.draw.circle(
+            if entries:
+                self.archive_selection %= len(entries)
+            draw_data_archive_screen(
                 self.screen,
-                NEON_CYAN,
-                (gx, gy),
-                pulse + 2,
-                1,
+                self.font,
+                self.big_font,
+                float(self.save_data["meta"].get("total_data_gb", 0.0)),
+                int(self.save_data["meta"].get("total_runs", 0)),
+                entries,
+                self.archive_selection,
+                self.modules,
+                self.archive_status,
             )
+            pygame.display.flip()
+            return
+        if self.state == "DEBRIEF":
+            draw_debrief_screen(self.screen, self.font, self.big_font, self.debrief_summary)
+            pygame.display.flip()
+            return
 
         for bullet in self.bullets:
             prev_x, prev_y = self._world_to_screen(
@@ -540,86 +554,17 @@ class Game:
                 BULLET_RADIUS,
             )
 
-        for rocket in self.rockets:
-            prev_x, prev_y = self._world_to_screen(
-                rocket.prev_x, rocket.prev_y, cam_x, cam_y, shake_x, shake_y
-            )
-            rocket_x, rocket_y = self._world_to_screen(
-                rocket.x, rocket.y, cam_x, cam_y, shake_x, shake_y
-            )
-            pygame.draw.line(
-                self.screen,
-                NEON_ORANGE,
-                (prev_x, prev_y),
-                (rocket_x, rocket_y),
-                3,
-            )
-            pygame.draw.circle(
-                self.screen,
-                NEON_ORANGE,
-                (rocket_x, rocket_y),
-                6,
-            )
-
-        if self.mining_laser_target is not None and self.mining_laser_target.hp > 0:
-            start_x, start_y = self._world_to_screen(
-                self.player.x, self.player.y, cam_x, cam_y, shake_x, shake_y
-            )
-            end_x, end_y = self._world_to_screen(
-                self.mining_laser_target.x,
-                self.mining_laser_target.y,
-                cam_x,
-                cam_y,
-                shake_x,
-                shake_y,
-            )
-            acquire_time = max(0.0001, self.player.get_mining_laser_stats()["acquire_time"])
-            lock_ratio = max(0.0, min(1.0, self.mining_laser_acquire_timer / acquire_time))
-            beam_color = (
-                int(80 + 175 * lock_ratio),
-                int(180 + 75 * lock_ratio),
-                int(60 + 195 * lock_ratio),
-            )
-            beam_width = max(2, int(3 + 4 * lock_ratio))
-            pygame.draw.line(self.screen, beam_color, (start_x, start_y), (end_x, end_y), beam_width)
-
-        for laser in self.lasers:
-            start_x, start_y = self._world_to_screen(
-                laser.start_x, laser.start_y, cam_x, cam_y, shake_x, shake_y
-            )
-            end_x, end_y = self._world_to_screen(
-                laser.end_x, laser.end_y, cam_x, cam_y, shake_x, shake_y
-            )
-            pygame.draw.line(
-                self.screen,
-                NEON_CYAN,
-                (start_x, start_y),
-                (end_x, end_y),
-                LASER_WIDTH,
-            )
-
-        for pulse in self.emp_pulses:
-            alpha = int(200 * (pulse.ttl / EMP_PULSE_LIFETIME))
-            width, height = self.screen.get_size()
-            pulse_surface = pygame.Surface((width, height), pygame.SRCALPHA)
-            pygame.draw.circle(
-                pulse_surface,
-                (*NEON_MAGENTA, alpha),
-                self._world_to_screen(pulse.x, pulse.y, cam_x, cam_y, shake_x, shake_y),
-                int(pulse.radius),
-                2,
-            )
-            self.screen.blit(pulse_surface, (0, 0))
-
-        for mine in self.mines:
-            mine_x, mine_y = self._world_to_screen(
-                mine.x, mine.y, cam_x, cam_y, shake_x, shake_y
-            )
-            pygame.draw.circle(self.screen, NEON_ORANGE, (mine_x, mine_y), 8, 2)
-            pygame.draw.circle(self.screen, RED, (mine_x, mine_y), 3, 0)
-
         for enemy in self.enemies:
             self._draw_enemy(enemy, cam_x, cam_y, shake_x, shake_y)
+        threat_board.draw_edge_indicators(
+            self.screen,
+            self.current_threats,
+            self._world_to_screen,
+            cam_x,
+            cam_y,
+            shake_x,
+            shake_y,
+        )
 
         px, py = self.player.pos
         screen_px, screen_py = self._world_to_screen(px, py, cam_x, cam_y, shake_x, shake_y)
@@ -636,27 +581,6 @@ class Game:
         front_x, front_y = front_point
         pygame.draw.circle(self.screen, ship_colors["ship_tip"], (int(front_x), int(front_y)), 3, 0)
         pygame.draw.circle(self.screen, ship_colors["ship_tip"], (int(front_x), int(front_y)), 5, 1)
-        
-        # Draw shield if active
-        if self.player.shield_level >= 0 and self.player.shield_hp > 0:
-            # Keep shield clearly outside the player triangle.
-            ship_outer_radius = PLAYER_RADIUS + 4
-            shield_radius = int(ship_outer_radius + 8)
-            shield_ratio = 0.0
-            if self.player.shield_max > 0:
-                shield_ratio = max(0.0, min(1.0, self.player.shield_hp / self.player.shield_max))
-            shield_color = (
-                int(80 + 70 * shield_ratio),
-                int(120 + 80 * shield_ratio),
-                255,
-            )
-            pygame.draw.circle(
-                self.screen,
-                shield_color,
-                (screen_px, screen_py),
-                shield_radius,
-                3,
-            )
 
         self._draw_particles(cam_x, cam_y, shake_x, shake_y)
         self._draw_vignette()
@@ -666,25 +590,30 @@ class Game:
             self.font,
             self.player,
             self.remaining,
-            self._get_weapon_slots(),
-            self._get_utility_slots(),
+            [
+                {
+                    "label": f"{self.primary_weapon.name} [{self.primary_weapon.mounting[:1].upper()}] G{self.selected_weapon_group}",
+                    "ammo_current": self.primary_weapon.ammo_current,
+                    "ammo_max": self.primary_weapon.ammo_max,
+                },
+                {
+                    "label": f"{self.secondary_weapon.name} [{self.secondary_weapon.mounting[:1].upper()}]",
+                    "ammo_current": self.secondary_weapon.ammo_current,
+                    "ammo_max": self.secondary_weapon.ammo_max,
+                },
+            ],
+            [],
+            self._get_extraction_text(),
+            int(self.save_data["meta"].get("total_runs", 0)),
         )
-        
-        # Draw level-up screen if in that state
-        if self.state == "LEVEL_UP":
-            draw_level_up_screen(
-                self.screen,
-                self.font,
-                self.big_font,
-                self.upgrade_options,
-                self.player,
-            )
+        if self.show_threat_board:
+            threat_board.draw_threat_board(self.screen, self.font, self.current_threats)
 
         if self.state == "PAUSE":
             draw_pause_menu(self.screen, self.font, self.big_font, self.pause_selection)
         
         draw_end_screen(self.screen, self.font, self.big_font, self.state, self.player)
-        if self.state in ("PLAY", "LEVEL_UP", "PAUSE"):
+        if self.state in ("PLAY", "PAUSE"):
             self.debug_overlay.draw(self.screen)
 
         pygame.display.flip()
@@ -710,14 +639,35 @@ class Game:
                                 self.menu_selection = (self.menu_selection + 1) % 3
                             elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
                                 if self.menu_selection == 0:
-                                    self.restart()
-                                    self._start_intro_cutscene()
+                                    self.state = "FITTING"
                                 elif self.menu_selection == 1:
                                     self.state = "OPTIONS"
                                 elif self.menu_selection == 2:
                                     self.running = False
                             elif event.key == pygame.K_ESCAPE:
                                 self.running = False
+                        elif self.state == "FITTING":
+                            ship = self.ships.get(self.selected_ship_id, {})
+                            slots = ship.get("slots", []) if isinstance(ship, dict) else []
+                            slot_count = len(slots) if isinstance(slots, list) else 0
+                            if event.key in (pygame.K_UP, pygame.K_w):
+                                if slot_count > 0:
+                                    self.fitting_selection = (self.fitting_selection - 1) % slot_count
+                            elif event.key in (pygame.K_DOWN, pygame.K_s):
+                                if slot_count > 0:
+                                    self.fitting_selection = (self.fitting_selection + 1) % slot_count
+                            elif event.key in (pygame.K_LEFT, pygame.K_a):
+                                self._cycle_slot_module(-1)
+                            elif event.key in (pygame.K_RIGHT, pygame.K_d):
+                                self._cycle_slot_module(1)
+                            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                                self.fitting_status = ""
+                                self.restart()
+                            elif event.key == pygame.K_TAB:
+                                self.archive_status = ""
+                                self.state = "ARCHIVE"
+                            elif event.key == pygame.K_ESCAPE:
+                                self.state = "MENU"
                         elif self.state == "OPTIONS":
                             if event.key in (pygame.K_UP, pygame.K_w):
                                 self.options_selection = (self.options_selection - 1) % 3
@@ -756,6 +706,14 @@ class Game:
                         elif self.state == "PLAY":
                             if event.key == pygame.K_ESCAPE:
                                 self.state = "PAUSE"
+                            elif pygame.K_1 <= event.key <= pygame.K_5:
+                                self.selected_weapon_group = event.key - pygame.K_0
+                            elif event.key == pygame.K_TAB:
+                                self.show_threat_board = not self.show_threat_board
+                            elif event.key == pygame.K_x and self.elapsed >= EXTRACTION_AVAILABLE_AT:
+                                if not self.extraction_active:
+                                    self.extraction_active = True
+                                    self.extraction_timer = EXTRACTION_CHANNEL_TIME
                         elif self.state == "PAUSE":
                             if event.key == pygame.K_ESCAPE:
                                 self.state = "PLAY"
@@ -770,32 +728,45 @@ class Game:
                                     self.restart()
                                 elif self.pause_selection == 2:
                                     self.state = "MENU"
-                        elif self.state in ("WIN", "LOSE"):
-                            if event.key == pygame.K_r:
-                                self.restart()
-                            elif event.key == pygame.K_ESCAPE:
-                                self.running = False
-                        # Level-up key selection
-                        if self.state == "LEVEL_UP":
-                            if event.key == pygame.K_1 and len(self.upgrade_options) >= 1:
-                                self._select_upgrade(0)
-                            elif event.key == pygame.K_2 and len(self.upgrade_options) >= 2:
-                                self._select_upgrade(1)
-                            elif event.key == pygame.K_3 and len(self.upgrade_options) >= 3:
-                                self._select_upgrade(2)
-                    elif (
-                        event.type == pygame.MOUSEBUTTONDOWN
-                        and event.button == 1
-                        and self.state == "LEVEL_UP"
-                    ):
-                        card_rects = get_level_up_card_rects(
-                            self.screen, len(self.upgrade_options)
-                        )
-                        for i, rect in enumerate(card_rects):
-                            if rect.collidepoint(event.pos):
-                                self._select_upgrade(i)
-                                break
-
+                        elif self.state == "DEBRIEF":
+                            if event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                                self.state = "FITTING"
+                            elif event.key == pygame.K_m:
+                                self.state = "MENU"
+                        elif self.state == "ARCHIVE":
+                            entries = fitting.build_archive_entries(
+                                self.modules,
+                                fitting.get_unlocked_module_ids(self.save_data),
+                            )
+                            if entries:
+                                self.archive_selection %= len(entries)
+                            if event.key in (pygame.K_UP, pygame.K_w):
+                                if entries:
+                                    self.archive_selection = (self.archive_selection - 1) % len(entries)
+                            elif event.key in (pygame.K_DOWN, pygame.K_s):
+                                if entries:
+                                    self.archive_selection = (self.archive_selection + 1) % len(entries)
+                            elif event.key in (pygame.K_RETURN, pygame.K_SPACE):
+                                if entries:
+                                    selected = entries[self.archive_selection]
+                                    unlocked, message = fitting.try_unlock_module(
+                                        self.save_data,
+                                        self.modules,
+                                        str(selected["id"]),
+                                    )
+                                    self.archive_status = message
+                                    if unlocked:
+                                        save_system.save_data(self.save_data)
+                                        ship = self.ships.get(self.selected_ship_id, {})
+                                        self.ship_equipment = fitting.sanitize_equipment(
+                                            self.ship_equipment,
+                                            ship,
+                                            self.modules,
+                                            fitting.get_unlocked_module_ids(self.save_data),
+                                        )
+                            if event.key == pygame.K_ESCAPE:
+                                self.archive_status = ""
+                                self.state = "FITTING"
                 if not self.running:
                     break
 
@@ -813,14 +784,6 @@ class Game:
         self.font, self.big_font = assets.load_fonts()
         self.cutscene_font = pygame.font.SysFont("consolas", 24)
 
-    def _select_upgrade(self, index: int) -> None:
-        if index < 0 or index >= len(self.upgrade_options):
-            return
-        upgrades.apply_upgrade(self.player, self.upgrade_options[index])
-        self.state = "PLAY"
-        self.upgrade_options.clear()
-        self.upgrade_resume_grace = 0.5
-
     def _get_shake_offset(self) -> tuple[float, float]:
         if self.shake_timer <= 0:
             return (0.0, 0.0)
@@ -834,6 +797,13 @@ class Game:
     def _add_screen_shake(self, strength: float) -> None:
         self.shake_strength = max(self.shake_strength, strength)
         self.shake_timer = max(self.shake_timer, 0.18)
+
+    def _get_extraction_text(self) -> str:
+        if self.elapsed < EXTRACTION_AVAILABLE_AT:
+            return ""
+        if self.extraction_active:
+            return f"EXTRACTING... {self.extraction_timer:0.1f}s"
+        return "EXTRACTION AVAILABLE - Press X"
 
     def _update_particles(self, dt: float) -> None:
         for particle in self.particles:
@@ -895,23 +865,6 @@ class Game:
                 )
             )
 
-    def _spawn_muzzle_flash(self, bullet: Bullet) -> None:
-        angle = math.atan2(bullet.vy, bullet.vx)
-        for _ in range(3):
-            jitter = random.uniform(-0.6, 0.6)
-            speed = random.uniform(140, 240)
-            self.particles.append(
-                Particle(
-                    x=bullet.x,
-                    y=bullet.y,
-                    vx=math.cos(angle + jitter) * speed,
-                    vy=math.sin(angle + jitter) * speed,
-                    ttl=random.uniform(0.08, 0.15),
-                    radius=random.uniform(1.0, 2.0),
-                    color=NEON_YELLOW,
-                )
-            )
-
     def _spawn_engine_particles(self) -> None:
         """Spawn engine thrust particles from the back of the ship."""
         if self.player.body is None:
@@ -950,7 +903,7 @@ class Game:
 
             # Color shifts from cyan to white based on thrust
             intensity = thrust_ratio
-            base_color = NEON_CYAN
+            base_color = NEON_BLUE
             color = (
                 int(base_color[0] + (255 - base_color[0]) * intensity * 0.3),
                 int(base_color[1] + (255 - base_color[1]) * intensity * 0.3),
@@ -1265,117 +1218,6 @@ class Game:
         front_x = x + (front_px * cos_a - front_py * sin_a)
         front_y = y + (front_px * sin_a + front_py * cos_a)
         return polys, (front_x, front_y)
-
-    def _get_weapon_slots(self) -> list[dict[str, object]]:
-        mining_laser_acquire = self.player.get_fire_cooldown()
-        mining_laser_ratio = min(1.0, self.fire_timer / max(0.0001, mining_laser_acquire))
-
-        rocket_ratio = 0.0
-        if self.player.rockets_level >= 0:
-            rocket_cd = self.player.get_rocket_stats()["fire_cooldown"]
-            rocket_ratio = min(1.0, self.rocket_timer / max(0.0001, rocket_cd))
-
-        laser_ratio = 0.0
-        if self.player.laser_level >= 0:
-            laser_cd = self.player.get_laser_stats()["fire_cooldown"]
-            laser_ratio = min(1.0, self.laser_timer / max(0.0001, laser_cd))
-
-        emp_ratio = 0.0
-        if self.player.emp_level >= 0:
-            emp_ratio = min(1.0, self.emp_timer / 0.5)
-
-        mine_ratio = 0.0
-        if self.player.mines_level >= 0:
-            mine_cd = self.player.get_mine_stats()["drop_cooldown"]
-            mine_ratio = min(1.0, self.mine_timer / max(0.0001, mine_cd))
-
-        return [
-            {
-                "label": "MINING",
-                "type_icon": "◉",
-                "cooldown_ratio": mining_laser_ratio,
-                "icon_color": NEON_YELLOW,
-            },
-            {
-                "label": "ROCKET",
-                "type_icon": "⊕",
-                "cooldown_ratio": rocket_ratio,
-                "icon_color": NEON_ORANGE if self.player.rockets_level >= 0 else (70, 70, 70),
-            },
-            {
-                "label": "LASER",
-                "type_icon": "⊕",
-                "cooldown_ratio": laser_ratio,
-                "icon_color": NEON_CYAN if self.player.laser_level >= 0 else (70, 70, 70),
-            },
-            {
-                "label": "EMP",
-                "type_icon": "◎",
-                "cooldown_ratio": emp_ratio,
-                "icon_color": NEON_MAGENTA if self.player.emp_level >= 0 else (70, 70, 70),
-            },
-            {
-                "label": "MINES",
-                "type_icon": "✹",
-                "cooldown_ratio": mine_ratio,
-                "icon_color": NEON_ORANGE if self.player.mines_level >= 0 else (70, 70, 70),
-            },
-            {
-                "label": "LOCKED",
-                "type_icon": "",
-                "cooldown_ratio": 0.0,
-                "icon_color": (70, 70, 70),
-            },
-        ]
-
-    def _get_utility_slots(self) -> list[dict[str, object]]:
-        hurdle_ratio = 1.0
-        if self.player.hurdle_cooldown > 0:
-            hurdle_ratio = max(0.0, 1.0 - (self.player.hurdle_cooldown / max(0.001, HURDLE_COOLDOWN)))
-
-        shield_ratio = 0.0
-        if self.player.shield_max > 0:
-            shield_ratio = max(0.0, min(1.0, self.player.shield_hp / self.player.shield_max))
-
-        return [
-            {
-                "label": "BOOST",
-                "type_icon": "",
-                "cooldown_ratio": self.player.boost_charge,
-                "icon_color": NEON_BLUE,
-            },
-            {
-                "label": "HURDLE",
-                "type_icon": "",
-                "cooldown_ratio": hurdle_ratio,
-                "icon_color": NEON_YELLOW,
-                "remaining_cd": self.player.hurdle_cooldown,
-            },
-            {
-                "label": "SHIELD",
-                "type_icon": "",
-                "cooldown_ratio": shield_ratio,
-                "icon_color": NEON_CYAN if self.player.shield_level >= 0 else (70, 70, 70),
-            },
-            {
-                "label": "TRACTOR",
-                "type_icon": "",
-                "cooldown_ratio": self.player.tractor_level / 5,
-                "icon_color": NEON_GREEN,
-            },
-            {
-                "label": "SPEED",
-                "type_icon": "",
-                "cooldown_ratio": self.player.speed_level / 5,
-                "icon_color": NEON_MAGENTA,
-            },
-            {
-                "label": "LOCKED",
-                "type_icon": "",
-                "cooldown_ratio": 0.0,
-                "icon_color": (70, 70, 70),
-            },
-        ]
 
     def _draw_enemy(
         self, enemy: Enemy, cam_x: float, cam_y: float, shake_x: float, shake_y: float

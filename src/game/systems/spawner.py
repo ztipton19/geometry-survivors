@@ -1,4 +1,4 @@
-"""Enemy spawning and scaling."""
+"""Enemy spawning for tactical multi-vector pressure."""
 
 from __future__ import annotations
 
@@ -7,131 +7,140 @@ import random
 
 from game import settings
 from game.entities.enemy import Enemy
-from game.settings import (
-    ENEMY_BASE_SPEED,
-    ENEMY_DAMAGE_BASE,
-    ENEMY_DAMAGE_MAX_BONUS,
-    ENEMY_DAMAGE_PER_SEC,
-    ENEMY_HP_BASE,
-    ENEMY_HP_MAX_BONUS,
-    ENEMY_HP_PER_SEC,
-    ENEMY_SPAWN_INTERVAL_MIN,
-    ENEMY_SPAWN_INTERVAL_DECAY,
-    ENEMY_SPAWN_INTERVAL_START,
-    ENEMY_SPEED_MAX_BONUS,
-    ENEMY_SPEED_PER_SEC,
-    ENEMY_XP_BASE,
-    ENEMY_XP_PER_HP,
-)
 
 
 class Spawner:
     def __init__(self) -> None:
-        self.spawn_interval = ENEMY_SPAWN_INTERVAL_START
         self.spawn_timer = 0.0
-        self.enemy_weights = [
-            (2.0, [(1, 0.7), (3, 0.3)]),
-            (5.0, [(1, 0.45), (3, 0.35), (4, 0.2)]),
-            (8.0, [(1, 0.3), (3, 0.35), (4, 0.25), (5, 0.1)]),
-            (11.0, [(1, 0.2), (3, 0.3), (4, 0.25), (5, 0.15), (6, 0.1)]),
-            (
-                60.0,
-                [
-                    (1, 0.15),
-                    (3, 0.25),
-                    (4, 0.25),
-                    (5, 0.18),
-                    (6, 0.12),
-                    (7, 0.03),
-                    (8, 0.02),
-                ],
-            ),
-        ]
-        self.enemy_scaling = {
-            1: {"speed": 1.28, "hp": 0.7, "damage": 0.8, "xp": 0.7, "radius": 0.9},
-            3: {"speed": 1.12, "hp": 0.9, "damage": 0.9, "xp": 0.95, "radius": 1.0},
-            4: {"speed": 0.98, "hp": 1.15, "damage": 1.1, "xp": 1.15, "radius": 1.05},
-            5: {"speed": 0.88, "hp": 1.45, "damage": 1.3, "xp": 1.45, "radius": 1.15},
-            6: {"speed": 0.8, "hp": 1.8, "damage": 1.55, "xp": 1.75, "radius": 1.25},
-            7: {"speed": 0.74, "hp": 2.05, "damage": 1.7, "xp": 2.05, "radius": 1.32},
-            8: {"speed": 0.7, "hp": 2.3, "damage": 1.9, "xp": 2.3, "radius": 1.4},
-            "boss": {"speed": 0.68, "hp": 2.9, "damage": 2.4, "xp": 3.0, "radius": 1.6},
+        self.max_enemies = 10
+        self.sector_count = 8
+        self.enemy_profiles: dict[str, dict[str, float | int | bool]] = {
+            "scout": {
+                "speed": 23.5,
+                "hp": 22.0,
+                "damage": 22.0,
+                "sides": 3,
+                "radius": 10.0,
+                "is_boss": False,
+                "behavior": "rush",
+                "preferred_range": 180.0,
+            },
+            "fighter": {
+                "speed": 18.5,
+                "hp": 30.0,
+                "damage": 24.0,
+                "sides": 4,
+                "radius": 12.0,
+                "is_boss": False,
+                "behavior": "skirmish",
+                "preferred_range": 260.0,
+            },
+            "frigate": {
+                "speed": 15.5,
+                "hp": 44.0,
+                "damage": 30.0,
+                "sides": 5,
+                "radius": 14.0,
+                "is_boss": False,
+                "behavior": "flank",
+                "preferred_range": 320.0,
+            },
+            "heavy": {
+                "speed": 12.5,
+                "hp": 62.0,
+                "damage": 36.0,
+                "sides": 6,
+                "radius": 16.0,
+                "is_boss": False,
+                "behavior": "siege",
+                "preferred_range": 220.0,
+            },
+            "cruiser": {
+                "speed": 10.2,
+                "hp": 88.0,
+                "damage": 44.0,
+                "sides": 8,
+                "radius": 20.0,
+                "is_boss": True,
+                "behavior": "siege",
+                "preferred_range": 260.0,
+            },
         }
 
     def reset(self) -> None:
-        self.spawn_interval = ENEMY_SPAWN_INTERVAL_START
         self.spawn_timer = 0.0
 
     def update(
-        self, dt: float, elapsed: float, enemies: list[Enemy], player_pos: tuple[float, float]
+        self,
+        dt: float,
+        elapsed: float,
+        enemies: list[Enemy],
+        player_pos: tuple[float, float],
     ) -> None:
-        self.spawn_timer += dt
-        self.spawn_interval = max(
-            ENEMY_SPAWN_INTERVAL_MIN,
-            ENEMY_SPAWN_INTERVAL_START - elapsed * ENEMY_SPAWN_INTERVAL_DECAY,
-        )
-        while self.spawn_timer >= self.spawn_interval:
-            self.spawn_timer -= self.spawn_interval
-            enemies.append(self._spawn_enemy(elapsed, player_pos))
+        if len(enemies) >= self.max_enemies:
+            return
 
-    def _spawn_enemy(self, elapsed: float, player_pos: tuple[float, float]) -> Enemy:
+        interval, active_sectors, profile_weights = self._get_schedule(elapsed)
+        self.spawn_timer += dt
+        while self.spawn_timer >= interval:
+            self.spawn_timer -= interval
+            if len(enemies) >= self.max_enemies:
+                break
+            enemies.append(
+                self._spawn_enemy(player_pos, active_sectors, profile_weights)
+            )
+
+    def _spawn_enemy(
+        self,
+        player_pos: tuple[float, float],
+        active_sectors: int,
+        profile_weights: list[tuple[str, float]],
+    ) -> Enemy:
         px, py = player_pos
-        view_radius = max(settings.WIDTH, settings.HEIGHT) * 0.65
-        margin = 140
+        view_radius = max(settings.WIDTH, settings.HEIGHT) * 0.70
+        margin = 180
         distance = view_radius + margin
-        angle = random.uniform(0, math.tau)
+
+        sector_size = math.tau / self.sector_count
+        sector_indices = random.sample(range(self.sector_count), k=max(1, min(active_sectors, self.sector_count)))
+        sector = random.choice(sector_indices)
+        angle = sector * sector_size + random.uniform(0.0, sector_size)
         x = px + math.cos(angle) * distance
         y = py + math.sin(angle) * distance
 
-        sides, scaling, is_boss = self._choose_enemy_profile(elapsed)
-
-        base_speed = ENEMY_BASE_SPEED + min(ENEMY_SPEED_MAX_BONUS, elapsed * ENEMY_SPEED_PER_SEC)
-        base_hp = ENEMY_HP_BASE + min(ENEMY_HP_MAX_BONUS, elapsed * ENEMY_HP_PER_SEC)
-        base_damage = ENEMY_DAMAGE_BASE + min(
-            ENEMY_DAMAGE_MAX_BONUS, elapsed * ENEMY_DAMAGE_PER_SEC
-        )
-
-        speed = base_speed * scaling["speed"]
-        hp = base_hp * scaling["hp"]
-        damage = base_damage * scaling["damage"]
-        xp_value = int(ENEMY_XP_BASE + base_hp * scaling["xp"] * ENEMY_XP_PER_HP)
-        radius = 12.0 * scaling["radius"]
-
+        profile_name = self._weighted_choice(profile_weights)
+        profile = self.enemy_profiles[profile_name]
         return Enemy(
             x=x,
             y=y,
-            speed=speed,
-            hp=hp,
-            damage=damage,
-            xp_value=xp_value,
-            sides=sides,
-            radius=radius,
-            is_boss=is_boss,
+            speed=float(profile["speed"]),
+            hp=float(profile["hp"]),
+            damage=float(profile["damage"]),
+            sides=int(profile["sides"]),
+            radius=float(profile["radius"]),
+            is_boss=bool(profile["is_boss"]),
+            behavior=str(profile.get("behavior", "rush")),
+            preferred_range=float(profile.get("preferred_range", 240.0)),
         )
 
-    def _choose_enemy_profile(self, elapsed: float) -> tuple[int, dict[str, float], bool]:
-        minutes = elapsed / 60.0
-        if self._should_spawn_boss(minutes):
-            return 8, self.enemy_scaling["boss"], True
-        for max_minutes, weights in self.enemy_weights:
-            if minutes <= max_minutes:
-                sides = self._weighted_choice(weights)
-                return sides, self.enemy_scaling.get(sides, self.enemy_scaling[4]), False
-        sides = self._weighted_choice(self.enemy_weights[-1][1])
-        return sides, self.enemy_scaling.get(sides, self.enemy_scaling[4]), False
-
-    def _should_spawn_boss(self, minutes: float) -> bool:
-        if minutes < 6.0:
-            return False
-        chance = min(0.12, 0.02 + (minutes - 6.0) * 0.01)
-        return random.random() < chance
-
-    def _weighted_choice(self, weights: list[tuple[int, float]]) -> int:
+    def _weighted_choice(self, weights: list[tuple[str, float]]) -> str:
         total = sum(weight for _, weight in weights)
         roll = random.random() * total
-        upto = 0.0
+        running = 0.0
         for value, weight in weights:
-            upto += weight
-            if roll <= upto:
+            running += weight
+            if roll <= running:
                 return value
         return weights[-1][0]
+
+    def _get_schedule(self, elapsed: float) -> tuple[float, int, list[tuple[str, float]]]:
+        minute = elapsed / 60.0
+        if minute < 3.0:
+            return 30.0, 1, [("scout", 0.7), ("fighter", 0.3)]
+        if minute < 7.0:
+            return 20.0, 2, [("scout", 0.45), ("fighter", 0.4), ("frigate", 0.15)]
+        if minute < 12.0:
+            return 15.0, 3, [("fighter", 0.45), ("frigate", 0.35), ("heavy", 0.2)]
+        if minute < 15.0:
+            return 9.0, self.sector_count, [("fighter", 0.22), ("frigate", 0.34), ("heavy", 0.32), ("cruiser", 0.12)]
+        return 7.0, self.sector_count, [("frigate", 0.24), ("heavy", 0.46), ("cruiser", 0.30)]

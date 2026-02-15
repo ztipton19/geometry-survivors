@@ -21,6 +21,9 @@ from game.settings import (
     ENEMY_BASE_SPEED,
     ROTATION_ACCEL,
     ROTATION_SPEED,
+    FUEL_BURN_RATE,
+    STRAFE_FUEL_MULT,
+    BOOST_FUEL_MULT,
     STRAFE_POWER,
     THROTTLE_STEP_PER_SEC,
     THRUST_POWER,
@@ -127,14 +130,18 @@ def apply_player_controls(
     body = getattr(player, "body", None)
     if body is None:
         return
+    fuel = float(getattr(player, "fuel", 0.0))
+    fuel_rate = float(getattr(player, "fuel_rate", 1.0))
+    has_fuel = fuel > 0.0
     drift_factor = float(getattr(player, "debug_drift_factor", DRIFT_FACTOR))
-    apply_rotation(
-        body,
-        rotate_direction,
-        dt,
-        float(getattr(player, "debug_rotation_speed", ROTATION_SPEED)),
-        float(getattr(player, "debug_rotation_accel", ROTATION_ACCEL)),
-    )
+    if has_fuel:
+        apply_rotation(
+            body,
+            rotate_direction,
+            dt,
+            float(getattr(player, "debug_rotation_speed", ROTATION_SPEED)),
+            float(getattr(player, "debug_rotation_accel", ROTATION_ACCEL)),
+        )
     body.angular_velocity *= max(0.0, min(1.0, drift_factor))
     speed_multiplier = 1.0
     if hasattr(player, "get_speed"):
@@ -158,23 +165,36 @@ def apply_player_controls(
     thrust_power = float(getattr(player, "debug_thrust_power", THRUST_POWER))
     strafe_power = float(getattr(player, "debug_strafe_power", STRAFE_POWER))
 
-    if throttle_level > 0:
-        apply_thrust(body, thrust_power * speed_multiplier * throttle_level)
+    if has_fuel and throttle_level > 0:
+        fuel_cost = FUEL_BURN_RATE * throttle_level * dt * fuel_rate
+        if fuel >= fuel_cost:
+            apply_thrust(body, thrust_power * speed_multiplier * throttle_level)
+            fuel -= fuel_cost
 
-    if strafe_direction != 0:
-        apply_strafe(body, strafe_power * speed_multiplier * strafe_direction)
+    if has_fuel and strafe_direction != 0 and fuel > 0.0:
+        fuel_cost = FUEL_BURN_RATE * STRAFE_FUEL_MULT * dt * fuel_rate
+        if fuel >= fuel_cost:
+            apply_strafe(body, strafe_power * speed_multiplier * strafe_direction)
+            fuel -= fuel_cost
 
     boost_charge = float(getattr(player, "boost_charge", 0.0))
     boost_timer = float(getattr(player, "boost_timer", 0.0))
     boost_unlocked = bool(getattr(player, "boost_unlocked", False))
-    if boost_unlocked and boost_pressed and boost_charge >= 1.0 and boost_timer <= 0.0:
+    if has_fuel and boost_unlocked and boost_pressed and boost_charge >= 1.0 and boost_timer <= 0.0:
         boost_timer = BOOST_DURATION
         boost_charge = 0.0
-    if boost_timer > 0.0:
-        apply_thrust(body, BOOST_FORCE * speed_multiplier)
-        boost_timer = max(0.0, boost_timer - dt)
+    if has_fuel and boost_timer > 0.0 and fuel > 0.0:
+        fuel_cost = FUEL_BURN_RATE * BOOST_FUEL_MULT * dt * fuel_rate
+        if fuel >= fuel_cost:
+            apply_thrust(body, BOOST_FORCE * speed_multiplier)
+            fuel -= fuel_cost
+            boost_timer = max(0.0, boost_timer - dt)
+        else:
+            boost_timer = 0.0
     else:
         boost_charge = min(1.0, boost_charge + dt / BOOST_RECHARGE_TIME)
+    fuel = max(0.0, fuel)
+    setattr(player, "fuel", fuel)
     setattr(player, "boost_timer", boost_timer)
     setattr(player, "boost_charge", boost_charge)
 
@@ -182,7 +202,7 @@ def apply_player_controls(
     hurdle_cooldown = float(getattr(player, "hurdle_cooldown", 0.0))
     if hurdle_cooldown > 0.0:
         hurdle_cooldown = max(0.0, hurdle_cooldown - dt)
-    elif hurdle_unlocked and hurdle_direction != 0.0:
+    elif has_fuel and hurdle_unlocked and hurdle_direction != 0.0:
         # Lateral hurdle (right is 1, 0)
         lateral = pymunk.Vec2d(1.0, 0.0).rotated(body.angle)
         body.velocity += lateral * (HURDLE_IMPULSE * hurdle_direction)
@@ -191,27 +211,53 @@ def apply_player_controls(
 
 
 def update_enemy_ai(enemies: Iterable[object], player_pos: tuple[float, float], dt: float) -> None:
-    """Simple homing behavior - enemies move directly toward player at constant speed."""
+    """Behavior-driven movement for enemies."""
     px, py = player_pos
     for enemy in enemies:
         body = getattr(enemy, "body", None)
         if body is None:
             continue
 
-        # Calculate direction to player
         dx = px - body.position.x
         dy = py - body.position.y
         distance = math.sqrt(dx * dx + dy * dy)
+        if distance <= 0.1:
+            continue
 
-        if distance > 0.1:  # Avoid division by zero
-            # Normalize direction and set velocity directly
-            enemy_speed = getattr(enemy, "speed", ENEMY_BASE_SPEED)
-            vx = (dx / distance) * enemy_speed
-            vy = (dy / distance) * enemy_speed
-            body.velocity = pymunk.Vec2d(vx, vy)
+        enemy_speed = float(getattr(enemy, "speed", ENEMY_BASE_SPEED))
+        nx = dx / distance
+        ny = dy / distance
+        tangent_x = -ny
+        tangent_y = nx
+        behavior = str(getattr(enemy, "behavior", "rush"))
+        preferred_range = float(getattr(enemy, "preferred_range", 240.0))
+        ai_clock = float(getattr(enemy, "ai_clock", 0.0)) + dt
+        setattr(enemy, "ai_clock", ai_clock)
 
-            # Rotate enemy to face movement direction (visual only)
-            body.angle = math.atan2(dy, dx) + math.pi / 2  # +90° because ship points up
+        if behavior == "rush":
+            vx = nx * enemy_speed
+            vy = ny * enemy_speed
+        elif behavior == "skirmish":
+            orbit_sign = 1.0 if int(getattr(enemy, "sides", 4)) % 2 == 0 else -1.0
+            radial = (distance - preferred_range) / max(1.0, preferred_range)
+            vx = tangent_x * enemy_speed * orbit_sign + nx * enemy_speed * max(-0.55, min(0.55, radial))
+            vy = tangent_y * enemy_speed * orbit_sign + ny * enemy_speed * max(-0.55, min(0.55, radial))
+        elif behavior == "flank":
+            wave = math.sin(ai_clock * 1.4 + int(getattr(enemy, "sides", 5)) * 0.3)
+            flank_strength = 0.85
+            inward_strength = 0.65 if distance > preferred_range else 0.2
+            vx = tangent_x * enemy_speed * wave * flank_strength + nx * enemy_speed * inward_strength
+            vy = tangent_y * enemy_speed * wave * flank_strength + ny * enemy_speed * inward_strength
+        else:  # siege
+            weave = math.sin(ai_clock * 0.8 + int(getattr(enemy, "sides", 6)) * 0.2) * 0.35
+            vx = nx * enemy_speed * 0.92 + tangent_x * enemy_speed * weave
+            vy = ny * enemy_speed * 0.92 + tangent_y * enemy_speed * weave
+
+        velocity = pymunk.Vec2d(vx, vy)
+        if velocity.length > enemy_speed:
+            velocity = velocity.normalized() * enemy_speed
+        body.velocity = velocity
+        body.angle = math.atan2(body.velocity.y, body.velocity.x) + math.pi / 2
 
 
 def sync_entity_positions(entities: Iterable[object]) -> None:
