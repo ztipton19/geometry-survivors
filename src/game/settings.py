@@ -30,8 +30,8 @@ PLAYER_RADIUS = 12
 PLAYER_MAX_HP = 100
 
 # Ship physics tuning (player only - enemies use simple homing)
-ROTATION_SPEED = 240  # deg/sec - Fast enough to feel responsive
-ROTATION_ACCEL = 800  # Instant turn start (no sluggishness)
+ROTATION_SPEED = 150  # deg/sec - lower top spin for control
+ROTATION_ACCEL = 300  # deg/sec^2 - smoother turn buildup
 
 THRUST_POWER = 73.125  # Balanced speed increase
 STRAFE_POWER = 64.35  # Balanced speed increase
@@ -39,7 +39,7 @@ MAX_SPEED = 56.25  # Balanced speed increase
 MIN_SPEED = 0  # Can stop completely
 
 FRICTION = 0.98  # Slow natural deceleration
-DRIFT_FACTOR = 0.995  # Mild angular drag; spin persists until counter-thrust
+DRIFT_FACTOR = 0.992  # Slightly stronger angular drag for easier stabilization
 
 REVERSE_POWER = 49.5  # Balanced speed increase
 THROTTLE_STEP_PER_SEC = 0.9
