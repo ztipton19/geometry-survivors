@@ -100,11 +100,19 @@ def sanitize_equipment(
         slot_id = str(slot.get("id", ""))
         if not slot_id:
             continue
+        # 1. Use player's existing selection if valid
         candidate = equipment.get(slot_id)
         if candidate in modules and candidate in unlocked_module_ids:
             if module_fits_slot(modules[candidate], slot):
                 cleaned[slot_id] = candidate
                 continue
+        # 2. Fall back to ship's default module for this slot
+        default_module = str(slot.get("default_module", ""))
+        if default_module and default_module in modules and default_module in unlocked_module_ids:
+            if module_fits_slot(modules[default_module], slot):
+                cleaned[slot_id] = default_module
+                continue
+        # 3. Last resort: first compatible module
         compatible = compatible_modules_for_slot(modules, unlocked_module_ids, slot)
         if compatible:
             cleaned[slot_id] = compatible[0]
