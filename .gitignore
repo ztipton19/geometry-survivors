@@ -90,6 +90,10 @@ desktop.ini
 # *.sav
 # highscores.dat
 
+# Web migration
+web/node_modules/
+web/dist/
+
 # Logs
 *.log
 logs/
