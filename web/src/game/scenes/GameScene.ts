@@ -14,12 +14,6 @@ import {
   COLORS,
 } from "../constants/settings";
 import {
-  chooseEnemySides,
-  ENEMY_SCALING,
-  type EnemyProfileKey,
-  shouldSpawnBoss,
-} from "../data/enemies";
-import {
   CARD_COLORS,
   UPGRADE_DEFINITIONS,
   type UpgradeId,
@@ -35,64 +29,18 @@ import {
   showLevelUpOverlay,
   showMenuOverlay,
 } from "../ui/gameUi";
-import { distanceToSegmentSquared, regularPolygonPoints } from "../utils/geometry";
+import { distanceToSegmentSquared } from "../utils/geometry";
+import type {
+  BulletModel,
+  EmpPulseModel,
+  EnemyModel,
+  LaserModel,
+  RocketModel,
+  XpGemModel,
+} from "../types/gameplay";
+import { computeSpawnInterval, spawnEnemy } from "../systems/enemies";
 
 type GameMode = "menu" | "play" | "levelup" | "win" | "lose";
-
-type EnemyModel = {
-  graphic: Phaser.GameObjects.Shape;
-  x: number;
-  y: number;
-  hp: number;
-  speed: number;
-  damage: number;
-  xpValue: number;
-  radius: number;
-  isBoss: boolean;
-  touchCooldown: number;
-};
-
-type BulletModel = {
-  graphic: Phaser.GameObjects.Arc;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  ttl: number;
-  damage: number;
-};
-
-type RocketModel = {
-  graphic: Phaser.GameObjects.Arc;
-  trail: Phaser.GameObjects.Graphics;
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  targetX: number;
-  targetY: number;
-  ttl: number;
-  damage: number;
-  splashRadius: number;
-};
-
-type LaserModel = {
-  graphic: Phaser.GameObjects.Line;
-  ttl: number;
-};
-
-type EmpPulseModel = {
-  graphic: Phaser.GameObjects.Arc;
-  ttl: number;
-};
-
-type XpGemModel = {
-  graphic: Phaser.GameObjects.Arc;
-  x: number;
-  y: number;
-  value: number;
-  lifetime: number;
-};
 
 export class GameScene extends Phaser.Scene implements UpgradeRuntime {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -432,73 +380,14 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
 
   private updateSpawning(dt: number): void {
     this.spawnTimer += dt;
-    const spawnInterval = Math.max(
-      ENEMY.spawnIntervalMin,
-      ENEMY.spawnIntervalStart - this.elapsed * ENEMY.spawnIntervalDecay,
-    );
+    const spawnInterval = computeSpawnInterval(this.elapsed);
 
     while (this.spawnTimer >= spawnInterval) {
       this.spawnTimer -= spawnInterval;
-      this.enemies.push(this.spawnEnemy());
+      this.enemies.push(
+        spawnEnemy(this, this.elapsed, this.playerPosition.x, this.playerPosition.y),
+      );
     }
-  }
-
-  private spawnEnemy(): EnemyModel {
-    const viewRadius = Math.max(GAME_WIDTH, GAME_HEIGHT) * 0.65;
-    const margin = 140;
-    const distance = viewRadius + margin;
-    const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
-    const x = this.playerPosition.x + Math.cos(angle) * distance;
-    const y = this.playerPosition.y + Math.sin(angle) * distance;
-
-    const minutes = this.elapsed / 60;
-    const isBoss = shouldSpawnBoss(minutes);
-    const sides = isBoss ? 8 : chooseEnemySides(minutes);
-    const scaling = ENEMY_SCALING[isBoss ? "boss" : (sides as EnemyProfileKey)];
-
-    const baseSpeed =
-      ENEMY.baseSpeed + Math.min(ENEMY.speedMaxBonus, this.elapsed * ENEMY.speedPerSecond);
-    const baseHp = ENEMY.baseHp + Math.min(ENEMY.hpMaxBonus, this.elapsed * ENEMY.hpPerSecond);
-    const baseDamage =
-      ENEMY.baseDamage + Math.min(ENEMY.damageMaxBonus, this.elapsed * ENEMY.damagePerSecond);
-    const radius = ENEMY.radius * scaling.radius;
-
-    return {
-      graphic: this.createEnemyGraphic(x, y, sides, radius, isBoss),
-      x,
-      y,
-      hp: baseHp * scaling.hp,
-      speed: baseSpeed * scaling.speed,
-      damage: baseDamage * scaling.damage,
-      xpValue: Math.round(ENEMY.baseXp + baseHp * scaling.xp * ENEMY.xpPerHp),
-      radius,
-      isBoss,
-      touchCooldown: 0,
-    };
-  }
-
-  private createEnemyGraphic(
-    x: number,
-    y: number,
-    sides: number,
-    radius: number,
-    isBoss: boolean,
-  ): Phaser.GameObjects.Shape {
-    if (sides <= 1) {
-      return this.add
-        .circle(x, y, radius, isBoss ? 0xff834d : COLORS.enemyRed, 0.88)
-        .setStrokeStyle(2, 0xffd2bf, isBoss ? 0.85 : 0.35);
-    }
-
-    return this.add
-      .polygon(
-        x,
-        y,
-        regularPolygonPoints(sides, radius),
-        isBoss ? 0xff834d : COLORS.enemyRed,
-        0.85,
-      )
-      .setStrokeStyle(2, isBoss ? 0xfff0cf : 0xff9898, isBoss ? 0.8 : 0.5);
   }
 
   private updateEnemies(dt: number): void {
