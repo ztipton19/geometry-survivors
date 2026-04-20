@@ -1,1 +1,1 @@
-"""Geometry Survivors game package."""
+"""Clone Protocol game package."""

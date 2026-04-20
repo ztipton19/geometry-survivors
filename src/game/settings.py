@@ -1,4 +1,4 @@
-"""Shared configuration for the Geometry Survivors prototype."""
+"""Shared configuration for the Clone Protocol prototype."""
 
 WIDTH, HEIGHT = 1100, 700
 FPS = 120
@@ -28,31 +28,42 @@ def get_ship_selection_colors() -> dict[str, tuple[int, int, int]]:
 PLAYER_SPEED = 37.125  # Reduced from 396 for slower movement
 PLAYER_RADIUS = 12
 PLAYER_MAX_HP = 100
+PLAYER_FUEL_START = 340.0
+FUEL_BURN_RATE = 1.05
+STRAFE_FUEL_MULT = 0.3
+BOOST_FUEL_MULT = 8.0
 
 # Ship physics tuning (player only - enemies use simple homing)
-ROTATION_SPEED = 240  # deg/sec - Fast enough to feel responsive
-ROTATION_ACCEL = 800  # Instant turn start (no sluggishness)
+ROTATION_SPEED = 60  # deg/sec - slow, weighty rotation
+ROTATION_ACCEL = 90  # deg/sec^2 - deliberate turn buildup
 
-THRUST_POWER = 48.75  # Balanced speed increase
-STRAFE_POWER = 42.9  # Balanced speed increase
-MAX_SPEED = 37.5  # Balanced speed increase
+THRUST_POWER = 73.125  # Balanced speed increase
+STRAFE_POWER = 64.35  # Balanced speed increase
+MAX_SPEED = 56.25  # Balanced speed increase
 MIN_SPEED = 0  # Can stop completely
 
 FRICTION = 0.98  # Slow natural deceleration
-DRIFT_FACTOR = 0.95  # High momentum carry (ice-like)
+DRIFT_FACTOR = 0.96  # Strong angular drag - rotation feels deliberate, not floaty
 
-REVERSE_POWER = 33  # Balanced speed increase
+REVERSE_POWER = 49.5  # Balanced speed increase
 THROTTLE_STEP_PER_SEC = 0.9
-BOOST_FORCE = 115.5  # Balanced speed increase
+BOOST_FORCE = 173.25  # Balanced speed increase
 BOOST_DURATION = 0.28
 BOOST_RECHARGE_TIME = 4.0
-HURDLE_IMPULSE = 23.1  # Balanced speed increase
+HURDLE_IMPULSE = 34.65  # Balanced speed increase
 HURDLE_COOLDOWN = 1.8
 
 BULLET_SPEED = 900.0
 BULLET_RADIUS = 3
 BULLET_DAMAGE = 12
 BULLET_LIFETIME = 1.2
+PDC_AMMO_START = 1200
+PDC_FIRE_RATE = 10.0
+PDC_GIMBAL_DEGREES = 15.0
+RAILGUN_AMMO_START = 8
+RAILGUN_FIRE_RATE = 0.5
+RAILGUN_GIMBAL_DEGREES = 5.0
+RAILGUN_DAMAGE = 150.0
 
 ROCKET_SPEED = 520.0
 ROCKET_LIFETIME = 2.2
@@ -63,24 +74,29 @@ EMP_PULSE_LIFETIME = 0.25
 FIRE_COOLDOWN_START = 0.14
 FIRE_COOLDOWN_MIN = 0.04
 
-ENEMY_BASE_SPEED = 12.9375  # Balanced speed increase
+ENEMY_BASE_SPEED = 19.40625  # Balanced speed increase
 ENEMY_RADIUS = 12
 ENEMY_SPAWN_INTERVAL_START = 0.75
 ENEMY_SPAWN_INTERVAL_MIN = 0.18
 ENEMY_SPAWN_INTERVAL_DECAY = 0.0028
-ENEMY_SPEED_PER_SEC = 0.12
-ENEMY_SPEED_MAX_BONUS = 10.5
+ENEMY_SPEED_PER_SEC = 0.18
+ENEMY_SPEED_MAX_BONUS = 15.75
 ENEMY_HP_BASE = 22.0
 ENEMY_HP_PER_SEC = 0.32
 ENEMY_HP_MAX_BONUS = 70.0
 ENEMY_DAMAGE_BASE = 22.0
 ENEMY_DAMAGE_PER_SEC = 0.025
 ENEMY_DAMAGE_MAX_BONUS = 16.0
-ENEMY_XP_BASE = 7.0
-ENEMY_XP_PER_HP = 0.32
+EXTRACTION_AVAILABLE_AT = 15 * 60
+EXTRACTION_CHANNEL_TIME = 5.0
+ROUND_SECONDS = 22 * 60
+DATA_PER_MINUTE = 1.0
+DATA_PER_KILL = 0.2
+DATA_EXTRACT_BONUS = 3.0
 
-XP_BASE = 90
-XP_GROWTH = 1.22
-XP_LINEAR_BONUS = 12
-
-ROUND_SECONDS = 15 * 60
+# Camera zoom
+ZOOM_DEFAULT = 0.55
+ZOOM_MIN = 0.3
+ZOOM_MAX = 1.0
+ZOOM_STEP = 0.05
+ZOOM_SMOOTH_SPEED = 6.0

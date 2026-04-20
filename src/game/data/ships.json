@@ -1,0 +1,18 @@
+{
+  "ships": {
+    "prospector": {
+      "name": "Prospector",
+      "base_mass": 1500,
+      "mass_limit": 3200,
+      "base_hull": 90,
+      "base_fuel": 300,
+      "base_speed": 37.125,
+      "slots": [
+        {"id": "weapon_primary", "type": "weapon", "slot_size": "S", "default_module": "pdc_array"},
+        {"id": "weapon_secondary", "type": "weapon", "slot_size": "M", "default_module": "railgun_mk1"},
+        {"id": "system_armor", "type": "system", "slot_size": "M", "default_module": "light_armor"},
+        {"id": "system_fuel", "type": "system", "slot_size": "M", "default_module": "standard_fuel_tank"}
+      ]
+    }
+  }
+}

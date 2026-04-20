@@ -172,7 +172,7 @@ def draw_oba_catamaran(screen, pos, angle, color=(90, 130, 160)):
     """
     Outer Belt Alliance twin-hull catamaran
     Two parallel pontoons connected by a wide base, with engine exhausts
-    Based on excalidraw design in geometry-survivors.excalidraw
+    Based on excalidraw design in clone-protocol.excalidraw
     """
     # Left pontoon (tall, narrow)
     left_hull = [

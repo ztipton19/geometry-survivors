@@ -1,0 +1,123 @@
+{
+  "modules": {
+    "pdc_array": {
+      "name": "PDC Array",
+      "type": "weapon",
+      "slot_size": "S",
+      "mounting": "forward",
+      "mass": 120,
+      "stats": {
+        "damage": 11,
+        "fire_rate": 9.5,
+        "ammo": 900,
+        "gimbal_degrees": 15.0
+      },
+      "unlock_cost": 0,
+      "tier": 1
+    },
+    "railgun_mk1": {
+      "name": "Railgun Mk-I",
+      "type": "weapon",
+      "slot_size": "M",
+      "mounting": "forward",
+      "mass": 200,
+      "stats": {
+        "damage": 145.0,
+        "fire_rate": 0.55,
+        "ammo": 10,
+        "gimbal_degrees": 7.0
+      },
+      "unlock_cost": 0,
+      "tier": 1
+    },
+    "pdc_dual_feed": {
+      "name": "PDC Dual-Feed",
+      "type": "weapon",
+      "slot_size": "S",
+      "mounting": "forward",
+      "mass": 170,
+      "stats": {
+        "damage": 10,
+        "fire_rate": 13.0,
+        "ammo": 1400,
+        "gimbal_degrees": 15.0
+      },
+      "unlock_cost": 5,
+      "tier": 1
+    },
+    "railgun_mk2": {
+      "name": "Railgun Mk-II",
+      "type": "weapon",
+      "slot_size": "M",
+      "mounting": "forward",
+      "mass": 250,
+      "stats": {
+        "damage": 220.0,
+        "fire_rate": 0.45,
+        "ammo": 12,
+        "gimbal_degrees": 7.0
+      },
+      "unlock_cost": 11,
+      "tier": 2
+    },
+    "flak_thrower": {
+      "name": "Flak Thrower",
+      "type": "weapon",
+      "slot_size": "S",
+      "mounting": "side",
+      "mass": 210,
+      "stats": {
+        "damage": 36,
+        "fire_rate": 2.2,
+        "ammo": 120,
+        "gimbal_degrees": 30.0
+      },
+      "unlock_cost": 14,
+      "tier": 2
+    },
+    "light_armor": {
+      "name": "Light Armor",
+      "type": "system",
+      "slot_size": "S",
+      "mass": 400,
+      "stats": {
+        "hull_bonus": 100
+      },
+      "unlock_cost": 0,
+      "tier": 1
+    },
+    "reinforced_armor": {
+      "name": "Reinforced Armor",
+      "type": "system",
+      "slot_size": "M",
+      "mass": 650,
+      "stats": {
+        "hull_bonus": 240
+      },
+      "unlock_cost": 7,
+      "tier": 1
+    },
+    "standard_fuel_tank": {
+      "name": "Standard Fuel Tank",
+      "type": "system",
+      "slot_size": "S",
+      "mass": 280,
+      "stats": {
+        "fuel_bonus": 90
+      },
+      "unlock_cost": 0,
+      "tier": 1
+    },
+    "extended_fuel_tank": {
+      "name": "Extended Fuel Tank",
+      "type": "system",
+      "slot_size": "M",
+      "mass": 520,
+      "stats": {
+        "fuel_bonus": 220
+      },
+      "unlock_cost": 9,
+      "tier": 2
+    }
+  }
+}
