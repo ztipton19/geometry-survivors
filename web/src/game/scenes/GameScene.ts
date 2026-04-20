@@ -39,6 +39,18 @@ import type {
   XpGemModel,
 } from "../types/gameplay";
 import { computeSpawnInterval, spawnEnemy } from "../systems/enemies";
+import {
+  cleanupDeadEnemies,
+  fireEmpPulse,
+  fireLaser,
+  findNearestEnemy,
+  spawnBullet,
+  spawnRocket,
+  updateBullets,
+  updateEmpPulses,
+  updateLasers,
+  updateRockets,
+} from "../systems/combat";
 
 type GameMode = "menu" | "play" | "levelup" | "win" | "lose";
 
@@ -412,92 +424,25 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
 
   private updateAutoFire(dt: number): void {
     this.fireTimer += dt;
-    const nearest = this.findNearestEnemy();
+    const nearest = findNearestEnemy(this.enemies, this.playerPosition.x, this.playerPosition.y);
     while (nearest && this.fireTimer >= this.fireCooldown) {
       this.fireTimer -= this.fireCooldown;
-      this.spawnBullet(nearest);
+      this.bullets.push(
+        spawnBullet(
+          this,
+          this.playerPosition.x,
+          this.playerPosition.y,
+          nearest,
+          this.bulletDamage,
+        ),
+      );
     }
-  }
-
-  private findNearestEnemy(): EnemyModel | null {
-    let best: EnemyModel | null = null;
-    let bestDistanceSquared = Number.POSITIVE_INFINITY;
-    for (const enemy of this.enemies) {
-      const dx = enemy.x - this.playerPosition.x;
-      const dy = enemy.y - this.playerPosition.y;
-      const distanceSquared = dx * dx + dy * dy;
-      if (distanceSquared < bestDistanceSquared) {
-        bestDistanceSquared = distanceSquared;
-        best = enemy;
-      }
-    }
-    return best;
-  }
-
-  private spawnBullet(target: EnemyModel): void {
-    const dx = target.x - this.playerPosition.x;
-    const dy = target.y - this.playerPosition.y;
-    const baseAngle = Math.atan2(dy, dx);
-    const angle = baseAngle + Phaser.Math.FloatBetween(-BULLET.spread, BULLET.spread);
-    const graphic = this.add.circle(
-      this.playerPosition.x,
-      this.playerPosition.y,
-      BULLET.radius,
-      COLORS.neonYellow,
-      1,
-    );
-    graphic.setStrokeStyle(1, 0xffffff, 0.65);
-
-    this.bullets.push({
-      graphic,
-      x: this.playerPosition.x,
-      y: this.playerPosition.y,
-      vx: Math.cos(angle) * BULLET.speed,
-      vy: Math.sin(angle) * BULLET.speed,
-      ttl: BULLET.lifetime,
-      damage: this.bulletDamage,
-    });
   }
 
   private updateBullets(dt: number): void {
-    const remainingBullets: BulletModel[] = [];
-    for (const bullet of this.bullets) {
-      bullet.x += bullet.vx * dt;
-      bullet.y += bullet.vy * dt;
-      bullet.ttl -= dt;
-      bullet.graphic.setPosition(bullet.x, bullet.y);
-
-      let hitEnemy: EnemyModel | null = null;
-      for (const enemy of this.enemies) {
-        const dx = enemy.x - bullet.x;
-        const dy = enemy.y - bullet.y;
-        const hitRadius = enemy.radius + BULLET.radius + 1;
-        if (dx * dx + dy * dy <= hitRadius * hitRadius) {
-          hitEnemy = enemy;
-          break;
-        }
-      }
-
-      if (hitEnemy) {
-        hitEnemy.hp -= bullet.damage;
-        bullet.graphic.destroy();
-        this.spawnHitFlash(hitEnemy.x, hitEnemy.y);
-        continue;
-      }
-
-      const insideBounds =
-        bullet.x >= -80 &&
-        bullet.x <= GAME_WIDTH + 80 &&
-        bullet.y >= -80 &&
-        bullet.y <= GAME_HEIGHT + 80;
-      if (bullet.ttl > 0 && insideBounds) {
-        remainingBullets.push(bullet);
-      } else {
-        bullet.graphic.destroy();
-      }
-    }
-
-    this.bullets = remainingBullets;
+    this.bullets = updateBullets(this.bullets, this.enemies, dt, (x, y) =>
+      this.spawnHitFlash(x, y),
+    );
     this.cleanupDeadEnemies();
   }
 
@@ -506,46 +451,27 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
       this.rocketTimer += dt;
       while (this.rocketTimer >= this.rocketCooldown) {
         this.rocketTimer -= this.rocketCooldown;
-        this.spawnRocket();
+        const pointer = this.input.activePointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
+        this.rockets.push(
+          spawnRocket(
+            this,
+            this.playerPosition.x,
+            this.playerPosition.y,
+            pointer.x,
+            pointer.y,
+            this.rocketDamage,
+            this.rocketSplashRadius,
+          ),
+        );
       }
     }
-
-    const remaining: RocketModel[] = [];
-    for (const rocket of this.rockets) {
-      const prevX = rocket.x;
-      const prevY = rocket.y;
-      rocket.x += rocket.vx * dt;
-      rocket.y += rocket.vy * dt;
-      rocket.ttl -= dt;
-      rocket.graphic.setPosition(rocket.x, rocket.y);
-      rocket.trail.clear();
-      rocket.trail.lineStyle(3, 0xff9600, 0.8);
-      rocket.trail.lineBetween(prevX, prevY, rocket.x, rocket.y);
-
-      let exploded = false;
-      for (const enemy of this.enemies) {
-        const dx = enemy.x - rocket.x;
-        const dy = enemy.y - rocket.y;
-        if (dx * dx + dy * dy <= (enemy.radius + ROCKET.radius) ** 2) {
-          exploded = true;
-          break;
-        }
-      }
-
-      const tx = rocket.targetX - rocket.x;
-      const ty = rocket.targetY - rocket.y;
-      if (!exploded && tx * tx + ty * ty <= 16 ** 2) {
-        exploded = true;
-      }
-
-      if (!exploded && rocket.ttl > 0) {
-        remaining.push(rocket);
-        continue;
-      }
-
-      this.explodeRocket(rocket);
-    }
-    this.rockets = remaining;
+    this.rockets = updateRockets(
+      this.rockets,
+      this.enemies,
+      dt,
+      (x, y) => this.spawnHitFlash(x, y),
+      (rocket) => this.explodeRocketVisual(rocket),
+    );
     this.cleanupDeadEnemies();
   }
 
@@ -554,21 +480,23 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
       this.laserTimer += dt;
       while (this.laserTimer >= this.laserCooldown) {
         this.laserTimer -= this.laserCooldown;
-        this.fireLaser();
+        const pointer = this.input.activePointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
+        this.lasers.push(
+          fireLaser(
+            this,
+            this.playerPosition.x,
+            this.playerPosition.y,
+            pointer.x,
+            pointer.y,
+            this.laserDamage,
+            this.enemies,
+            (x, y) => this.spawnHitFlash(x, y),
+          ),
+        );
+        this.cleanupDeadEnemies();
       }
     }
-
-    const remaining: LaserModel[] = [];
-    for (const laser of this.lasers) {
-      laser.ttl -= dt;
-      if (laser.ttl > 0) {
-        laser.graphic.setAlpha(laser.ttl / LASER.lifetime);
-        remaining.push(laser);
-      } else {
-        laser.graphic.destroy();
-      }
-    }
-    this.lasers = remaining;
+    this.lasers = updateLasers(this.lasers, dt);
   }
 
   private updateEmp(dt: number): void {
@@ -576,21 +504,20 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
       this.empTimer += dt;
       while (this.empTimer >= EMP.pulseInterval) {
         this.empTimer -= EMP.pulseInterval;
-        this.fireEmpPulse();
+        this.empPulses.push(
+          fireEmpPulse(
+            this,
+            this.playerPosition.x,
+            this.playerPosition.y,
+            this.empRadius,
+            this.empDamage,
+            this.enemies,
+            (x, y) => this.spawnHitFlash(x, y),
+          ),
+        );
       }
     }
-
-    const remaining: EmpPulseModel[] = [];
-    for (const pulse of this.empPulses) {
-      pulse.ttl -= dt;
-      if (pulse.ttl > 0) {
-        pulse.graphic.setAlpha(0.7 * (pulse.ttl / EMP.pulseLifetime));
-        remaining.push(pulse);
-      } else {
-        pulse.graphic.destroy();
-      }
-    }
-    this.empPulses = remaining;
+    this.empPulses = updateEmpPulses(this.empPulses, dt);
     this.cleanupDeadEnemies();
   }
 
@@ -613,18 +540,11 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
   }
 
   private cleanupDeadEnemies(): void {
-    const survivors: EnemyModel[] = [];
-    for (const enemy of this.enemies) {
-      if (enemy.hp > 0) {
-        survivors.push(enemy);
-        continue;
-      }
-      enemy.graphic.destroy();
+    this.enemies = cleanupDeadEnemies(this.enemies, (enemy) => {
       this.enemiesKilled += 1;
       this.spawnXpGem(enemy.x, enemy.y, enemy.xpValue);
       this.spawnDeathBurst(enemy.x, enemy.y, enemy.isBoss);
-    }
-    this.enemies = survivors;
+    });
   }
 
   private spawnXpGem(x: number, y: number, value: number): void {
@@ -773,43 +693,7 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     });
   }
 
-  private spawnRocket(): void {
-    const pointer = this.input.activePointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
-    const dx = pointer.x - this.playerPosition.x;
-    const dy = pointer.y - this.playerPosition.y;
-    const distance = Math.max(0.001, Math.hypot(dx, dy));
-    const trail = this.add.graphics();
-    const graphic = this.add.circle(this.playerPosition.x, this.playerPosition.y, ROCKET.radius, 0xff9600, 1);
-    graphic.setStrokeStyle(1, 0xffefbf, 0.9);
-
-    this.rockets.push({
-      graphic,
-      trail,
-      x: this.playerPosition.x,
-      y: this.playerPosition.y,
-      vx: (dx / distance) * ROCKET.speed,
-      vy: (dy / distance) * ROCKET.speed,
-      targetX: pointer.x,
-      targetY: pointer.y,
-      ttl: ROCKET.lifetime,
-      damage: this.rocketDamage,
-      splashRadius: this.rocketSplashRadius,
-    });
-  }
-
-  private explodeRocket(rocket: RocketModel): void {
-    rocket.graphic.destroy();
-    rocket.trail.destroy();
-
-    for (const enemy of this.enemies) {
-      const dx = enemy.x - rocket.x;
-      const dy = enemy.y - rocket.y;
-      if (dx * dx + dy * dy <= rocket.splashRadius ** 2) {
-        enemy.hp -= rocket.damage;
-        this.spawnHitFlash(enemy.x, enemy.y);
-      }
-    }
-
+  private explodeRocketVisual(rocket: RocketModel): void {
     const burst = this.add.circle(rocket.x, rocket.y, rocket.splashRadius * 0.55, 0xff9600, 0.25);
     burst.setStrokeStyle(2, 0xffefbf, 0.8);
     this.tweens.add({
@@ -819,71 +703,6 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
       duration: 180,
       onComplete: () => burst.destroy(),
     });
-  }
-
-  private fireLaser(): void {
-    const pointer = this.input.activePointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
-    const dx = pointer.x - this.playerPosition.x;
-    const dy = pointer.y - this.playerPosition.y;
-    const distance = Math.max(0.001, Math.hypot(dx, dy));
-    const nx = dx / distance;
-    const ny = dy / distance;
-    const length = Math.max(GAME_WIDTH, GAME_HEIGHT) * 1.25;
-    const endX = this.playerPosition.x + nx * length;
-    const endY = this.playerPosition.y + ny * length;
-
-    for (const enemy of this.enemies) {
-      if (
-        distanceToSegmentSquared(
-          enemy.x,
-          enemy.y,
-          this.playerPosition.x,
-          this.playerPosition.y,
-          endX,
-          endY,
-        ) <=
-        (enemy.radius + LASER.width) ** 2
-      ) {
-        enemy.hp -= this.laserDamage;
-        this.spawnHitFlash(enemy.x, enemy.y);
-      }
-    }
-
-    const graphic = this.add.line(
-      0,
-      0,
-      this.playerPosition.x,
-      this.playerPosition.y,
-      endX,
-      endY,
-      COLORS.neonCyan,
-      0.85,
-    );
-    graphic.setOrigin(0, 0);
-    graphic.setLineWidth(LASER.width, LASER.width);
-    this.lasers.push({ graphic, ttl: LASER.lifetime });
-    this.cleanupDeadEnemies();
-  }
-
-  private fireEmpPulse(): void {
-    const graphic = this.add.circle(
-      this.playerPosition.x,
-      this.playerPosition.y,
-      this.empRadius,
-      COLORS.neonMagenta,
-      0.08,
-    );
-    graphic.setStrokeStyle(3, COLORS.neonMagenta, 0.7);
-    this.empPulses.push({ graphic, ttl: EMP.pulseLifetime });
-
-    for (const enemy of this.enemies) {
-      const dx = enemy.x - this.playerPosition.x;
-      const dy = enemy.y - this.playerPosition.y;
-      if (dx * dx + dy * dy <= this.empRadius ** 2) {
-        enemy.hp -= this.empDamage;
-        this.spawnHitFlash(enemy.x, enemy.y);
-      }
-    }
   }
 
   private applyPlayerDamage(amount: number): void {
