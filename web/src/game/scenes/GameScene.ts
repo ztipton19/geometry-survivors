@@ -26,6 +26,15 @@ import {
   type UpgradeRuntime,
   type UpgradeState,
 } from "../data/upgrades";
+import {
+  createHud,
+  createOverlay,
+  type Hud,
+  type Overlay,
+  showEndOverlay,
+  showLevelUpOverlay,
+  showMenuOverlay,
+} from "../ui/gameUi";
 import { distanceToSegmentSquared, regularPolygonPoints } from "../utils/geometry";
 
 type GameMode = "menu" | "play" | "levelup" | "win" | "lose";
@@ -83,33 +92,6 @@ type XpGemModel = {
   y: number;
   value: number;
   lifetime: number;
-};
-
-type Hud = {
-  timer: Phaser.GameObjects.Text;
-  level: Phaser.GameObjects.Text;
-  xp: Phaser.GameObjects.Text;
-  kills: Phaser.GameObjects.Text;
-  hp: Phaser.GameObjects.Text;
-  status: Phaser.GameObjects.Text;
-  prompt: Phaser.GameObjects.Text;
-};
-
-type UpgradeCard = {
-  container: Phaser.GameObjects.Container;
-  background: Phaser.GameObjects.Rectangle;
-  title: Phaser.GameObjects.Text;
-  detail: Phaser.GameObjects.Text;
-  bounds: Phaser.Geom.Rectangle;
-};
-
-type Overlay = {
-  container: Phaser.GameObjects.Container;
-  backdrop: Phaser.GameObjects.Rectangle;
-  title: Phaser.GameObjects.Text;
-  subtitle: Phaser.GameObjects.Text;
-  cards: UpgradeCard[];
-  footer: Phaser.GameObjects.Text;
 };
 
 export class GameScene extends Phaser.Scene implements UpgradeRuntime {
@@ -184,9 +166,9 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
 
   create(): void {
     this.drawBackdrop();
-    this.hud = this.createHud();
+    this.hud = createHud(this);
     this.createPlayer();
-    this.overlay = this.createOverlay();
+    this.overlay = createOverlay(this);
 
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.wasd = this.input.keyboard!.addKeys("W,A,S,D") as Record<
@@ -210,7 +192,7 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
       }
     });
 
-    this.showMenuOverlay();
+    showMenuOverlay(this.overlay);
     this.updateHud();
   }
 
@@ -238,10 +220,10 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     if (this.playerHp <= 0) {
       this.playerHp = 0;
       this.mode = "lose";
-      this.showEndOverlay("SYSTEM FAILURE", "Press R or Enter to restart");
+      showEndOverlay(this.overlay, "SYSTEM FAILURE", "Press R or Enter to restart", false);
     } else if (this.remaining <= 0) {
       this.mode = "win";
-      this.showEndOverlay("MISSION COMPLETE", "Press R or Enter to run again");
+      showEndOverlay(this.overlay, "MISSION COMPLETE", "Press R or Enter to run again", true);
     }
 
     this.updateHud();
@@ -338,169 +320,6 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.shieldRing = this.add.circle(this.playerPosition.x, this.playerPosition.y, 24);
     this.shieldRing.setStrokeStyle(3, 0x6fb3ff, 0);
     this.shieldRing.setFillStyle(0x6fb3ff, 0);
-  }
-
-  private createHud(): Hud {
-    this.add
-      .text(24, 14, "GEOMETRY SURVIVORS", {
-        fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "28px",
-        color: "#00ffff",
-      })
-      .setShadow(0, 0, "#00ffff", 12, true, true);
-
-    const timer = this.add
-      .text(GAME_WIDTH - 24, 18, "15:00", {
-        fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "32px",
-        color: "#ffff00",
-      })
-      .setOrigin(1, 0)
-      .setShadow(0, 0, "#ffff00", 10, true, true);
-
-    const level = this.add.text(24, 56, "LVL 1", {
-      fontFamily: "Trebuchet MS, sans-serif",
-      fontSize: "18px",
-      color: "#f0f0f0",
-    });
-
-    const xp = this.add.text(24, 82, "XP 0 / 90", {
-      fontFamily: "Trebuchet MS, sans-serif",
-      fontSize: "16px",
-      color: "#f0f0f0",
-    });
-
-    const kills = this.add.text(24, 106, "KILLS 0", {
-      fontFamily: "Trebuchet MS, sans-serif",
-      fontSize: "16px",
-      color: "#ff3c3c",
-    });
-
-    const hp = this.add.text(24, 130, "HP 100 / 100", {
-      fontFamily: "Trebuchet MS, sans-serif",
-      fontSize: "16px",
-      color: "#00ff78",
-    });
-
-    const status = this.add
-      .text(GAME_WIDTH - 24, 68, "", {
-        fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "14px",
-        color: "#d0d7de",
-        align: "right",
-      })
-      .setOrigin(1, 0);
-
-    const prompt = this.add
-      .text(24, GAME_HEIGHT - 34, "WASD / Arrows to move   Mouse to aim   Auto-fire online", {
-        fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "16px",
-        color: "#00ff78",
-      })
-      .setAlpha(0.85);
-
-    return { timer, level, xp, kills, hp, status, prompt };
-  }
-
-  private createOverlay(): Overlay {
-    const backdrop = this.add
-      .rectangle(GAME_WIDTH / 2, GAME_HEIGHT / 2, GAME_WIDTH, GAME_HEIGHT, 0x000000, 0.76)
-      .setVisible(false);
-
-    const title = this.add
-      .text(GAME_WIDTH / 2, 116, "", {
-        fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "40px",
-        color: "#ffff00",
-        align: "center",
-      })
-      .setOrigin(0.5, 0)
-      .setVisible(false);
-
-    const subtitle = this.add
-      .text(GAME_WIDTH / 2, 168, "", {
-        fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "18px",
-        color: "#f0f0f0",
-        align: "center",
-        wordWrap: { width: 820 },
-      })
-      .setOrigin(0.5, 0)
-      .setVisible(false);
-
-    const footer = this.add
-      .text(GAME_WIDTH / 2, GAME_HEIGHT - 78, "", {
-        fontFamily: "Trebuchet MS, sans-serif",
-        fontSize: "16px",
-        color: "#00ff78",
-        align: "center",
-      })
-      .setOrigin(0.5, 0)
-      .setVisible(false);
-
-    const cards: UpgradeCard[] = [];
-    const cardWidth = 280;
-    const cardHeight = 190;
-    const gap = 26;
-    const startX = (GAME_WIDTH - (cardWidth * 3 + gap * 2)) / 2;
-
-    for (let i = 0; i < 3; i += 1) {
-      const x = startX + i * (cardWidth + gap);
-      const y = 250;
-      const bounds = new Phaser.Geom.Rectangle(x, y, cardWidth, cardHeight);
-      const background = this.add
-        .rectangle(x + cardWidth / 2, y + cardHeight / 2, cardWidth, cardHeight, 0x1a1f2a, 0.95)
-        .setStrokeStyle(2, CARD_COLORS[i], 0.9)
-        .setVisible(false);
-      const number = this.add
-        .text(x + 18, y + 14, `${i + 1}`, {
-          fontFamily: "Trebuchet MS, sans-serif",
-          fontSize: "30px",
-          color: Phaser.Display.Color.IntegerToColor(CARD_COLORS[i]).rgba,
-        })
-        .setVisible(false);
-      const titleText = this.add
-        .text(x + 62, y + 18, "", {
-          fontFamily: "Trebuchet MS, sans-serif",
-          fontSize: "20px",
-          color: "#ffffff",
-          wordWrap: { width: cardWidth - 78 },
-        })
-        .setVisible(false);
-      const detail = this.add
-        .text(x + 18, y + 62, "", {
-          fontFamily: "Trebuchet MS, sans-serif",
-          fontSize: "15px",
-          color: "#d0d7de",
-          wordWrap: { width: cardWidth - 36 },
-          lineSpacing: 6,
-        })
-        .setVisible(false);
-      const hint = this.add
-        .text(x + 18, y + cardHeight - 34, `Press ${i + 1} or click`, {
-          fontFamily: "Trebuchet MS, sans-serif",
-          fontSize: "14px",
-          color: "#88ffb0",
-        })
-        .setVisible(false);
-
-      const container = this.add
-        .container(0, 0, [background, number, titleText, detail, hint])
-        .setVisible(false);
-      cards.push({ container, background, title: titleText, detail, bounds });
-    }
-
-    const container = this.add.container(0, 0, [
-      backdrop,
-      title,
-      subtitle,
-      footer,
-      ...cards.map((card) => card.container),
-    ]);
-    container.setDepth(20);
-    container.setVisible(false);
-
-    return { container, backdrop, title, subtitle, cards, footer };
   }
 
   private drawBackdrop(): void {
@@ -967,7 +786,13 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
       this.upgradeOptions = this.generateUpgradeOptions();
       if (this.upgradeOptions.length > 0) {
         this.mode = "levelup";
-        this.showLevelUpOverlay();
+        showLevelUpOverlay(
+          this.overlay,
+          this,
+          this.upgradeOptions,
+          UPGRADE_DEFINITIONS,
+          (id) => this.getUpgradeState(id),
+        );
         return;
       }
     }
@@ -1027,70 +852,6 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.hud.kills.setText(`KILLS ${this.enemiesKilled}`);
     this.hud.hp.setText(`HP ${Math.ceil(this.playerHp)} / ${Math.ceil(this.playerMaxHp)}`);
     this.hud.status.setText(this.buildStatusText());
-  }
-
-  private showMenuOverlay(): void {
-    this.overlay.container.setVisible(true);
-    this.overlay.backdrop.setFillStyle(0x000000, 0.72);
-    this.overlay.title.setText("GEOMETRY SURVIVORS").setColor("#00ffff").setVisible(true);
-    this.overlay.subtitle
-      .setText(
-        "Browser migration build\nFight off the swarm and survive 15 minutes.\n\nPress Enter or Space to deploy.",
-      )
-      .setVisible(true);
-    this.overlay.footer
-      .setText("Current web slice: core combat, full weapon kit, and survival upgrades")
-      .setVisible(true);
-    for (const card of this.overlay.cards) {
-      card.container.setVisible(false);
-    }
-  }
-
-  private showLevelUpOverlay(): void {
-    this.overlay.container.setVisible(true);
-    this.overlay.backdrop.setFillStyle(0x000000, 0.82);
-    this.overlay.title.setText("LEVEL UP!").setColor("#ffff00").setVisible(true);
-    this.overlay.subtitle.setText("Choose an upgrade to keep the run alive.").setVisible(true);
-    this.overlay.footer.setText("Select with 1, 2, 3 or click a card").setVisible(true);
-
-    for (let i = 0; i < this.overlay.cards.length; i += 1) {
-      const card = this.overlay.cards[i];
-      const id = this.upgradeOptions[i];
-      if (!id) {
-        card.container.setVisible(false);
-        continue;
-      }
-
-      const definition = UPGRADE_DEFINITIONS[id];
-      const nextLevel = this.getUpgradeState(id).level + 1;
-      card.title.setText(definition.name);
-      card.detail.setText(
-        [
-          definition.category,
-          `Current: ${definition.currentDescription(this)}`,
-          `Next: ${definition.nextDescription(this, nextLevel)}`,
-        ].join("\n"),
-      );
-      card.container.setVisible(true);
-    }
-  }
-
-  private showEndOverlay(title: string, subtitle: string): void {
-    this.overlay.container.setVisible(true);
-    this.overlay.backdrop.setFillStyle(0x000000, 0.78);
-    this.overlay.title
-      .setText(title)
-      .setColor(this.mode === "win" ? "#00ff78" : "#ff5c5c")
-      .setVisible(true);
-    this.overlay.subtitle
-      .setText(
-        `${subtitle}\n\nLevel ${this.playerLevel}   Kills ${this.enemiesKilled}   Time ${this.formatElapsed()}`,
-      )
-      .setVisible(true);
-    this.overlay.footer.setText("Enter or R to restart").setVisible(true);
-    for (const card of this.overlay.cards) {
-      card.container.setVisible(false);
-    }
   }
 
   private formatElapsed(): string {
