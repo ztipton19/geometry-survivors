@@ -51,6 +51,15 @@ import {
   updateLasers,
   updateRockets,
 } from "../systems/combat";
+import {
+  applyPlayerDamage,
+  awardXp,
+  buildStatusText,
+  generateUpgradeOptions,
+  getUpgradeState,
+  resetProgression,
+  updateShield,
+} from "../systems/progression";
 
 type GameMode = "menu" | "play" | "levelup" | "win" | "lose";
 
@@ -87,10 +96,10 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
 
   public playerHp: number = PLAYER.maxHp;
   public playerMaxHp: number = PLAYER.maxHp;
-  private playerLevel = 1;
-  private playerXp = 0;
-  private xpToNext: number = PLAYER.xpBase;
-  private enemiesKilled = 0;
+  public playerLevel = 1;
+  public playerXp = 0;
+  public xpToNext: number = PLAYER.xpBase;
+  public enemiesKilled = 0;
 
   public fireCooldown: number = PLAYER.fireCooldown;
   public bulletDamage: number = PLAYER.bulletDamage;
@@ -322,38 +331,7 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.player.setPosition(this.playerPosition.x, this.playerPosition.y);
     this.velocity.set(0, 0);
 
-    this.playerHp = PLAYER.maxHp;
-    this.playerMaxHp = PLAYER.maxHp;
-    this.playerLevel = 1;
-    this.playerXp = 0;
-    this.xpToNext = PLAYER.xpBase;
-    this.enemiesKilled = 0;
-
-    this.minigunLevel = 0;
-    this.rocketsLevel = -1;
-    this.laserLevel = -1;
-    this.empLevel = -1;
-    this.healthLevel = 0;
-    this.shieldLevel = -1;
-    this.tractorLevel = 0;
-    this.speedLevel = 0;
-
-    this.fireCooldown = PLAYER.fireCooldown;
-    this.bulletDamage = PLAYER.bulletDamage;
-    this.rocketDamage = 0;
-    this.rocketSplashRadius = 0;
-    this.rocketCooldown = 999;
-    this.laserDamage = 0;
-    this.laserCooldown = 999;
-    this.empDamage = 0;
-    this.empRadius = 0;
-    this.maxSpeed = PLAYER.maxSpeed;
-    this.tractorRange = PLAYER.tractorRange;
-    this.shieldHp = 0;
-    this.shieldMax = 0;
-    this.shieldRegenRate = 0;
-    this.shieldRegenDelay = 0;
-    this.shieldRegenDelayMax = 0;
+    resetProgression(this);
     this.shieldRing.setStrokeStyle(3, 0x6fb3ff, 0);
 
     this.hud.prompt.setText("WASD / Arrows to move   Mouse to aim   Survive 15 minutes");
@@ -413,7 +391,7 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
 
       if (distance < enemy.radius + PLAYER.radius + 6 && enemy.touchCooldown <= 0) {
         enemy.touchCooldown = ENEMY.contactDamageCooldown;
-        this.applyPlayerDamage(enemy.damage * 0.3);
+        applyPlayerDamage(this, enemy.damage * 0.3);
         this.spawnHitFlash(this.playerPosition.x, this.playerPosition.y);
       }
 
@@ -522,21 +500,8 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
   }
 
   private updateShield(dt: number): void {
-    if (this.shieldLevel < 0) {
-      return;
-    }
-
-    const ratio = this.shieldMax > 0 ? this.shieldHp / this.shieldMax : 0;
-    this.shieldRing.setStrokeStyle(3, 0x6fb3ff, ratio > 0 ? 0.2 + ratio * 0.55 : 0);
-
-    if (this.shieldHp >= this.shieldMax) {
-      return;
-    }
-    if (this.shieldRegenDelay > 0) {
-      this.shieldRegenDelay = Math.max(0, this.shieldRegenDelay - dt);
-      return;
-    }
-    this.shieldHp = Math.min(this.shieldMax, this.shieldHp + this.shieldRegenRate * dt);
+    const alpha = updateShield(this, dt);
+    this.shieldRing.setStrokeStyle(3, 0x6fb3ff, alpha);
   }
 
   private cleanupDeadEnemies(): void {
@@ -584,57 +549,20 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
   }
 
   private addXp(amount: number): void {
-    this.playerXp += amount;
-    while (this.playerXp >= this.xpToNext) {
-      this.playerXp -= this.xpToNext;
-      this.playerLevel += 1;
-      this.xpToNext = Math.round(
-        PLAYER.xpBase * PLAYER.xpGrowth ** (this.playerLevel - 1) +
-          PLAYER.xpLinearBonus * (this.playerLevel - 1),
-      );
-      this.upgradeOptions = this.generateUpgradeOptions();
+    if (awardXp(this, amount)) {
+      this.upgradeOptions = generateUpgradeOptions(this);
       if (this.upgradeOptions.length > 0) {
         this.mode = "levelup";
-        showLevelUpOverlay(
-          this.overlay,
-          this,
-          this.upgradeOptions,
-          UPGRADE_DEFINITIONS,
-          (id) => this.getUpgradeState(id),
+        showLevelUpOverlay(this.overlay, this, this.upgradeOptions, UPGRADE_DEFINITIONS, (id) =>
+          this.getUpgradeState(id),
         );
         return;
       }
     }
   }
 
-  private generateUpgradeOptions(): UpgradeId[] {
-    const allOptions = (Object.keys(UPGRADE_DEFINITIONS) as UpgradeId[]).filter((id) => {
-      const state = this.getUpgradeState(id);
-      return state.level < state.maxLevel;
-    });
-    Phaser.Utils.Array.Shuffle(allOptions);
-    return allOptions.slice(0, Math.min(3, allOptions.length));
-  }
-
   private getUpgradeState(id: UpgradeId): UpgradeState {
-    switch (id) {
-      case "minigun":
-        return { level: this.minigunLevel, maxLevel: UPGRADE_DEFINITIONS.minigun.maxLevel };
-      case "rockets":
-        return { level: this.rocketsLevel, maxLevel: UPGRADE_DEFINITIONS.rockets.maxLevel };
-      case "laser":
-        return { level: this.laserLevel, maxLevel: UPGRADE_DEFINITIONS.laser.maxLevel };
-      case "emp":
-        return { level: this.empLevel, maxLevel: UPGRADE_DEFINITIONS.emp.maxLevel };
-      case "health":
-        return { level: this.healthLevel, maxLevel: UPGRADE_DEFINITIONS.health.maxLevel };
-      case "shield":
-        return { level: this.shieldLevel, maxLevel: UPGRADE_DEFINITIONS.shield.maxLevel };
-      case "tractor":
-        return { level: this.tractorLevel, maxLevel: UPGRADE_DEFINITIONS.tractor.maxLevel };
-      case "speed":
-        return { level: this.speedLevel, maxLevel: UPGRADE_DEFINITIONS.speed.maxLevel };
-    }
+    return getUpgradeState(this, id);
   }
 
   private selectUpgrade(index: number): void {
@@ -660,7 +588,7 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.hud.xp.setText(`XP ${Math.floor(this.playerXp)} / ${this.xpToNext}`);
     this.hud.kills.setText(`KILLS ${this.enemiesKilled}`);
     this.hud.hp.setText(`HP ${Math.ceil(this.playerHp)} / ${Math.ceil(this.playerMaxHp)}`);
-    this.hud.status.setText(this.buildStatusText());
+    this.hud.status.setText(buildStatusText(this));
   }
 
   private formatElapsed(): string {
@@ -703,33 +631,6 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
       duration: 180,
       onComplete: () => burst.destroy(),
     });
-  }
-
-  private applyPlayerDamage(amount: number): void {
-    if (this.shieldLevel >= 0 && this.shieldHp > 0) {
-      if (this.shieldHp >= amount) {
-        this.shieldHp -= amount;
-      } else {
-        const remaining = amount - this.shieldHp;
-        this.shieldHp = 0;
-        this.playerHp = Math.max(0, this.playerHp - remaining);
-      }
-      this.shieldRegenDelay = this.shieldRegenDelayMax;
-      return;
-    }
-    this.playerHp = Math.max(0, this.playerHp - amount);
-  }
-
-  private buildStatusText(): string {
-    return [
-      `Minigun L${this.minigunLevel + 1}`,
-      this.rocketsLevel >= 0 ? `Rockets L${this.rocketsLevel + 1}` : "Rockets locked",
-      this.laserLevel >= 0 ? `Laser L${this.laserLevel + 1}` : "Laser locked",
-      this.empLevel >= 0 ? `EMP L${this.empLevel + 1}` : "EMP locked",
-      this.shieldLevel >= 0
-        ? `Shield ${Math.ceil(this.shieldHp)}/${Math.ceil(this.shieldMax)}`
-        : "Shield offline",
-    ].join("\n");
   }
 
 }

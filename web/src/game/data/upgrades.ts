@@ -35,6 +35,7 @@ export type UpgradeRuntime = {
   shieldHp: number;
   shieldMax: number;
   shieldRegenRate: number;
+  shieldRegenDelay: number;
   shieldRegenDelayMax: number;
   tractorRange: number;
   tractorLevel: number;
