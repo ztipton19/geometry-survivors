@@ -60,6 +60,7 @@ import {
   resetProgression,
   updateShield,
 } from "../systems/progression";
+import { spawnXpGem, updateXpGems } from "../systems/xp";
 
 type GameMode = "menu" | "play" | "levelup" | "win" | "lose";
 
@@ -507,45 +508,20 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
   private cleanupDeadEnemies(): void {
     this.enemies = cleanupDeadEnemies(this.enemies, (enemy) => {
       this.enemiesKilled += 1;
-      this.spawnXpGem(enemy.x, enemy.y, enemy.xpValue);
+      this.xpGems.push(spawnXpGem(this, enemy.x, enemy.y, enemy.xpValue));
       this.spawnDeathBurst(enemy.x, enemy.y, enemy.isBoss);
     });
   }
 
-  private spawnXpGem(x: number, y: number, value: number): void {
-    const graphic = this.add.circle(x, y, 6, COLORS.neonGreen, 0.95);
-    graphic.setStrokeStyle(2, COLORS.neonCyan, 0.75);
-    this.xpGems.push({ graphic, x, y, value, lifetime: XP_GEM.lifetime });
-  }
-
   private updateXpGems(dt: number): void {
-    const remainingGems: XpGemModel[] = [];
-    for (const gem of this.xpGems) {
-      gem.lifetime -= dt;
-      const dx = this.playerPosition.x - gem.x;
-      const dy = this.playerPosition.y - gem.y;
-      const distanceSquared = dx * dx + dy * dy;
-
-      if (this.tractorRange > 0 && distanceSquared < this.tractorRange * this.tractorRange) {
-        const distance = Math.max(0.001, Math.sqrt(distanceSquared));
-        gem.x += (dx / distance) * XP_GEM.magnetSpeed * dt;
-        gem.y += (dy / distance) * XP_GEM.magnetSpeed * dt;
-      }
-
-      gem.graphic.setPosition(gem.x, gem.y);
-      if (distanceSquared <= XP_GEM.pickupRadius * XP_GEM.pickupRadius) {
-        gem.graphic.destroy();
-        this.addXp(gem.value);
-        continue;
-      }
-
-      if (gem.lifetime > 0) {
-        remainingGems.push(gem);
-      } else {
-        gem.graphic.destroy();
-      }
-    }
-    this.xpGems = remainingGems;
+    this.xpGems = updateXpGems(
+      this.xpGems,
+      this.playerPosition.x,
+      this.playerPosition.y,
+      this.tractorRange,
+      dt,
+      (value) => this.addXp(value),
+    );
   }
 
   private addXp(amount: number): void {
