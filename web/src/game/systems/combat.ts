@@ -6,14 +6,14 @@ import {
   EMP,
   GAME_HEIGHT,
   GAME_WIDTH,
-  LASER,
+  RAIL_GUN,
   ROCKET,
 } from "../constants/settings";
 import type {
   BulletModel,
   EmpPulseModel,
   EnemyModel,
-  LaserModel,
+  RailGunShotModel,
   RocketModel,
 } from "../types/gameplay";
 import { distanceToSegmentSquared } from "../utils/geometry";
@@ -220,29 +220,27 @@ export function updateRockets(
   return remaining;
 }
 
-export function fireLaser(
+export function fireRailGun(
   scene: Phaser.Scene,
   playerX: number,
   playerY: number,
-  pointerX: number,
-  pointerY: number,
+  headingX: number,
+  headingY: number,
   damage: number,
   enemies: EnemyModel[],
   onHit: HitCallback,
-): LaserModel {
-  const dx = pointerX - playerX;
-  const dy = pointerY - playerY;
-  const distance = Math.max(0.001, Math.hypot(dx, dy));
-  const nx = dx / distance;
-  const ny = dy / distance;
+): RailGunShotModel {
   const length = Math.max(GAME_WIDTH, GAME_HEIGHT) * 1.25;
+  const directionLength = Math.max(0.001, Math.hypot(headingX, headingY));
+  const nx = headingX / directionLength;
+  const ny = headingY / directionLength;
   const endX = playerX + nx * length;
   const endY = playerY + ny * length;
 
   for (const enemy of enemies) {
     if (
       distanceToSegmentSquared(enemy.x, enemy.y, playerX, playerY, endX, endY) <=
-      (enemy.radius + LASER.width) ** 2
+      (enemy.radius + RAIL_GUN.width) ** 2
     ) {
       enemy.hp -= damage;
       onHit(enemy.x, enemy.y);
@@ -251,20 +249,20 @@ export function fireLaser(
 
   const graphic = scene.add.line(0, 0, playerX, playerY, endX, endY, COLORS.neonCyan, 0.85);
   graphic.setOrigin(0, 0);
-  graphic.setLineWidth(LASER.width, LASER.width);
+  graphic.setLineWidth(RAIL_GUN.width, RAIL_GUN.width);
 
-  return { graphic, ttl: LASER.lifetime };
+  return { graphic, ttl: RAIL_GUN.lifetime };
 }
 
-export function updateLasers(lasers: LaserModel[], dt: number): LaserModel[] {
-  const remaining: LaserModel[] = [];
-  for (const laser of lasers) {
-    laser.ttl -= dt;
-    if (laser.ttl > 0) {
-      laser.graphic.setAlpha(laser.ttl / LASER.lifetime);
-      remaining.push(laser);
+export function updateRailGunShots(shots: RailGunShotModel[], dt: number): RailGunShotModel[] {
+  const remaining: RailGunShotModel[] = [];
+  for (const shot of shots) {
+    shot.ttl -= dt;
+    if (shot.ttl > 0) {
+      shot.graphic.setAlpha(shot.ttl / RAIL_GUN.lifetime);
+      remaining.push(shot);
     } else {
-      laser.graphic.destroy();
+      shot.graphic.destroy();
     }
   }
   return remaining;

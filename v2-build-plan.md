@@ -18,7 +18,7 @@ This document maps the path from the current v1 prototype (Vampire Survivors-sty
 |--------|-------|-------|
 | Pymunk physics engine | `physics.py` | Core of the game. Newtonian movement works. |
 | Pygame rendering | `world.py`, entities | Drawing, particles, screen shake - all good |
-| Ship controls | `entities/player.py` | Throttle, rotation, strafe, boost, hurdle |
+| Ship controls | `entities/player.py` | Tank controls with thrust, rotation, boost, and future unlock mobility abilities |
 | Entity architecture | `entities/` | Player, Enemy, Bullet, Particle base classes |
 | Collision system | `systems/collisions.py` | Pymunk collision handlers, needs modification |
 | Background/stars | `world.py` | Procedural starfield, nebulae, grid |
@@ -128,7 +128,7 @@ class WeaponState:
 **Tasks:**
 - [ ] Add `fuel` property to player entity
 - [ ] Main thrust consumes fuel proportional to throttle
-- [ ] RCS (strafe) consumes fuel at reduced rate (0.3x)
+- [ ] Rotation thrusters consume fuel at reduced rate (0.3x)
 - [ ] Boost consumes fuel at high rate (10x)
 - [ ] When fuel = 0: no thrust, no RCS, no boost. Player drifts on current vector.
 - [ ] Fuel gauge on HUD (prominent, always visible)

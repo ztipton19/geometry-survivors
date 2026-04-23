@@ -14,9 +14,9 @@ export type Hud = {
   healthBarFill: Phaser.GameObjects.Rectangle;
   shieldBarBack: Phaser.GameObjects.Rectangle;
   shieldBarFill: Phaser.GameObjects.Rectangle;
-  laserLabel: Phaser.GameObjects.Text;
-  laserChargeBack: Phaser.GameObjects.Graphics;
-  laserChargeFill: Phaser.GameObjects.Graphics;
+  railGunLabel: Phaser.GameObjects.Text;
+  railGunChargeBack: Phaser.GameObjects.Graphics;
+  railGunChargeFill: Phaser.GameObjects.Graphics;
   rocketLabel: Phaser.GameObjects.Text;
   rocketChargeBack: Phaser.GameObjects.Graphics;
   rocketChargeFill: Phaser.GameObjects.Graphics;
@@ -127,8 +127,8 @@ export function createHud(scene: Phaser.Scene): Hud {
     .setOrigin(0, 0)
     .setScrollFactor(0);
 
-  const laserLabel = scene.add
-    .text(GAME_WIDTH / 2 - 34, GAME_HEIGHT / 2 - 28, "L", {
+  const railGunLabel = scene.add
+    .text(GAME_WIDTH / 2 - 34, GAME_HEIGHT / 2 - 28, "RG", {
       fontFamily: "Trebuchet MS, sans-serif",
       fontSize: "16px",
       color: "#5cf2ff",
@@ -136,8 +136,8 @@ export function createHud(scene: Phaser.Scene): Hud {
     .setOrigin(0.5, 1)
     .setAlpha(0.5);
 
-  const laserChargeBack = scene.add.graphics().setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2);
-  const laserChargeFill = scene.add.graphics().setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2);
+  const railGunChargeBack = scene.add.graphics().setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2);
+  const railGunChargeFill = scene.add.graphics().setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2);
 
   const rocketLabel = scene.add
     .text(GAME_WIDTH / 2 + 34, GAME_HEIGHT / 2 - 28, "R", {
@@ -152,7 +152,7 @@ export function createHud(scene: Phaser.Scene): Hud {
   const rocketChargeFill = scene.add.graphics().setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2);
 
   const prompt = scene.add
-    .text(24, GAME_HEIGHT - 34, "WASD / Arrows to move   Mouse to aim   Auto-fire online", {
+    .text(24, GAME_HEIGHT - 34, "W/S thrust   A/D rotate   Mouse guides rockets", {
       fontFamily: "Trebuchet MS, sans-serif",
       fontSize: "16px",
       color: "#00ff78",
@@ -171,9 +171,9 @@ export function createHud(scene: Phaser.Scene): Hud {
     healthBarFill,
     shieldBarBack,
     shieldBarFill,
-    laserLabel,
-    laserChargeBack,
-    laserChargeFill,
+    railGunLabel,
+    railGunChargeBack,
+    railGunChargeFill,
     rocketLabel,
     rocketChargeBack,
     rocketChargeFill,

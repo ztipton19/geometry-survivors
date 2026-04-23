@@ -18,7 +18,7 @@ export function resetProgression(runtime: ProgressionRuntime): void {
 
   runtime.minigunLevel = 0;
   runtime.rocketsLevel = -1;
-  runtime.laserLevel = -1;
+  runtime.railGunLevel = -1;
   runtime.empLevel = -1;
   runtime.healthLevel = 0;
   runtime.shieldLevel = -1;
@@ -30,8 +30,8 @@ export function resetProgression(runtime: ProgressionRuntime): void {
   runtime.rocketDamage = 0;
   runtime.rocketSplashRadius = 0;
   runtime.rocketCooldown = 999;
-  runtime.laserDamage = 0;
-  runtime.laserCooldown = 999;
+  runtime.railGunDamage = 0;
+  runtime.railGunCooldown = 999;
   runtime.empDamage = 0;
   runtime.empRadius = 0;
   runtime.maxSpeed = PLAYER.maxSpeed;
@@ -66,8 +66,8 @@ export function getUpgradeState(runtime: ProgressionRuntime, id: UpgradeId): Upg
       return { level: runtime.minigunLevel, maxLevel: UPGRADE_DEFINITIONS.minigun.maxLevel };
     case "rockets":
       return { level: runtime.rocketsLevel, maxLevel: UPGRADE_DEFINITIONS.rockets.maxLevel };
-    case "laser":
-      return { level: runtime.laserLevel, maxLevel: UPGRADE_DEFINITIONS.laser.maxLevel };
+    case "railGun":
+      return { level: runtime.railGunLevel, maxLevel: UPGRADE_DEFINITIONS.railGun.maxLevel };
     case "emp":
       return { level: runtime.empLevel, maxLevel: UPGRADE_DEFINITIONS.emp.maxLevel };
     case "health":
@@ -132,7 +132,7 @@ export function buildStatusText(runtime: ProgressionRuntime): string {
   return [
     `Minigun L${runtime.minigunLevel + 1}`,
     runtime.rocketsLevel >= 0 ? `Rockets L${runtime.rocketsLevel + 1}` : "Rockets locked",
-    runtime.laserLevel >= 0 ? `Laser L${runtime.laserLevel + 1}` : "Laser locked",
+    runtime.railGunLevel >= 0 ? `Rail Gun L${runtime.railGunLevel + 1}` : "Rail Gun locked",
     runtime.empLevel >= 0 ? `EMP L${runtime.empLevel + 1}` : "EMP locked",
     runtime.shieldLevel >= 0
       ? `Shield ${Math.ceil(runtime.shieldHp)}/${Math.ceil(runtime.shieldMax)}`

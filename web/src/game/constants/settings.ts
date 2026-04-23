@@ -17,8 +17,8 @@ export const PLAYER = {
   radius: 12,
   thrust: 540,
   reverseThrust: 320,
-  lateralNudgeImpulse: 110,
-  damping: 0.985,
+  turnSpeed: 2.8,
+  damping: 1,
   maxSpeed: 320,
   maxHp: 100,
   fireCooldown: 0.4,
@@ -42,7 +42,7 @@ export const ROCKET = {
   lifetime: 2.2,
 } as const;
 
-export const LASER = {
+export const RAIL_GUN = {
   lifetime: 0.12,
   width: 6,
 } as const;

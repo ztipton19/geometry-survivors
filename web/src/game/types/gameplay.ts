@@ -37,7 +37,7 @@ export type RocketModel = {
   splashRadius: number;
 };
 
-export type LaserModel = {
+export type RailGunShotModel = {
   graphic: Phaser.GameObjects.Line;
   ttl: number;
 };

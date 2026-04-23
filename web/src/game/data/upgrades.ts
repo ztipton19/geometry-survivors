@@ -3,7 +3,7 @@ import { COLORS, PLAYER } from "../constants/settings";
 export type UpgradeId =
   | "minigun"
   | "rockets"
-  | "laser"
+  | "railGun"
   | "emp"
   | "health"
   | "shield"
@@ -22,9 +22,9 @@ export type UpgradeRuntime = {
   rocketDamage: number;
   rocketSplashRadius: number;
   rocketCooldown: number;
-  laserLevel: number;
-  laserDamage: number;
-  laserCooldown: number;
+  railGunLevel: number;
+  railGunDamage: number;
+  railGunCooldown: number;
   empLevel: number;
   empDamage: number;
   empRadius: number;
@@ -72,7 +72,7 @@ const ROCKET_LEVELS = [
   { damage: 50, splashRadius: 60, fireCooldown: 2.2 },
   { damage: 55, splashRadius: 65, fireCooldown: 2.0 },
 ];
-const LASER_LEVELS = [
+const RAIL_GUN_LEVELS = [
   { damage: 15, fireCooldown: 5.0 },
   { damage: 20, fireCooldown: 4.5 },
   { damage: 25, fireCooldown: 4.0 },
@@ -140,24 +140,24 @@ export const UPGRADE_DEFINITIONS: Record<UpgradeId, UpgradeDefinition<UpgradeRun
       scene.rocketCooldown = stats.fireCooldown;
     },
   },
-  laser: {
-    id: "laser",
-    name: "Laser",
+  railGun: {
+    id: "railGun",
+    name: "Rail Gun",
     category: "WEAPON",
     maxLevel: 5,
     currentDescription: (scene) =>
-      scene.laserLevel < 0
-        ? "Unlock a piercing beam"
-        : `${Math.round(scene.laserDamage)} damage, ${scene.laserCooldown.toFixed(1)}s cooldown`,
+      scene.railGunLevel < 0
+        ? "Unlock a forward-firing rail shot"
+        : `${Math.round(scene.railGunDamage)} damage, ${scene.railGunCooldown.toFixed(1)}s cooldown`,
     nextDescription: (_scene, nextLevel) => {
-      const stats = LASER_LEVELS[nextLevel];
+      const stats = RAIL_GUN_LEVELS[nextLevel];
       return `${stats.damage} damage, ${stats.fireCooldown.toFixed(1)}s cooldown`;
     },
     apply: (scene, nextLevel) => {
-      const stats = LASER_LEVELS[nextLevel];
-      scene.laserLevel = nextLevel;
-      scene.laserDamage = stats.damage;
-      scene.laserCooldown = stats.fireCooldown;
+      const stats = RAIL_GUN_LEVELS[nextLevel];
+      scene.railGunLevel = nextLevel;
+      scene.railGunDamage = stats.damage;
+      scene.railGunCooldown = stats.fireCooldown;
     },
   },
   emp: {

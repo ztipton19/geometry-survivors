@@ -6,7 +6,6 @@ import {
   ENEMY,
   GAME_HEIGHT,
   GAME_WIDTH,
-  LASER,
   PLAYER,
   ROCKET,
   ROUND_SECONDS,
@@ -35,7 +34,7 @@ import type {
   BulletModel,
   EmpPulseModel,
   EnemyModel,
-  LaserModel,
+  RailGunShotModel,
   RocketModel,
   XpGemModel,
 } from "../types/gameplay";
@@ -43,13 +42,13 @@ import { computeSpawnInterval, spawnEnemy } from "../systems/enemies";
 import {
   cleanupDeadEnemies,
   fireEmpPulse,
-  fireLaser,
+  fireRailGun,
   findNearestEnemy,
   spawnBullet,
   spawnRocket,
   updateBullets,
   updateEmpPulses,
-  updateLasers,
+  updateRailGunShots,
   updateRockets,
 } from "../systems/combat";
 import {
@@ -78,11 +77,12 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
   private overlay!: Overlay;
   private mode: GameMode = "menu";
   private velocity = new Phaser.Math.Vector2();
+  private playerHeading = -Math.PI / 2;
 
   private enemies: EnemyModel[] = [];
   private bullets: BulletModel[] = [];
   private rockets: RocketModel[] = [];
-  private lasers: LaserModel[] = [];
+  private railGunShots: RailGunShotModel[] = [];
   private empPulses: EmpPulseModel[] = [];
   private xpGems: XpGemModel[] = [];
   private upgradeOptions: UpgradeId[] = [];
@@ -92,7 +92,7 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
   private spawnTimer = 0;
   private fireTimer = 0;
   private rocketTimer = 0;
-  private laserTimer = 0;
+  private railGunTimer = 0;
   private empTimer = 0;
 
   public playerHp: number = PLAYER.maxHp;
@@ -107,8 +107,8 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
   public rocketDamage = 0;
   public rocketSplashRadius = 0;
   public rocketCooldown = 999;
-  public laserDamage = 0;
-  public laserCooldown = 999;
+  public railGunDamage = 0;
+  public railGunCooldown = 999;
   public empDamage = 0;
   public empRadius = 0;
   public maxSpeed: number = PLAYER.maxSpeed;
@@ -121,7 +121,7 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
 
   public minigunLevel = 0;
   public rocketsLevel = -1;
-  public laserLevel = -1;
+  public railGunLevel = -1;
   public empLevel = -1;
   public healthLevel = 0;
   public shieldLevel = -1;
@@ -147,9 +147,9 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.hud.healthBarFill.setVisible(visible);
     this.hud.shieldBarBack.setVisible(visible);
     this.hud.shieldBarFill.setVisible(visible);
-    this.hud.laserLabel.setVisible(visible);
-    this.hud.laserChargeBack.setVisible(visible);
-    this.hud.laserChargeFill.setVisible(visible);
+    this.hud.railGunLabel.setVisible(visible);
+    this.hud.railGunChargeBack.setVisible(visible);
+    this.hud.railGunChargeFill.setVisible(visible);
     this.hud.rocketLabel.setVisible(visible);
     this.hud.rocketChargeBack.setVisible(visible);
     this.hud.rocketChargeFill.setVisible(visible);
@@ -206,7 +206,7 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.updateAutoFire(dt);
     this.updateBullets(dt);
     this.updateRockets(dt);
-    this.updateLasers(dt);
+    this.updateRailGun(dt);
     this.updateEmp(dt);
     this.updateXpGems(dt);
     this.updateShield(dt);
@@ -269,15 +269,21 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
   }
 
   private updateMovement(dt: number): void {
-    const pointer = this.input.activePointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
-    const angle = Phaser.Math.Angle.Between(
-      this.playerPosition.x,
-      this.playerPosition.y,
-      pointer.x,
-      pointer.y,
+    const rotateLeft = this.cursors.left.isDown || this.wasd.A.isDown;
+    const rotateRight = this.cursors.right.isDown || this.wasd.D.isDown;
+
+    if (rotateLeft) {
+      this.playerHeading -= PLAYER.turnSpeed * dt;
+    }
+
+    if (rotateRight) {
+      this.playerHeading += PLAYER.turnSpeed * dt;
+    }
+
+    const forward = new Phaser.Math.Vector2(
+      Math.cos(this.playerHeading),
+      Math.sin(this.playerHeading),
     );
-    const forward = new Phaser.Math.Vector2(Math.cos(angle), Math.sin(angle));
-    const lateral = new Phaser.Math.Vector2(-forward.y, forward.x);
 
     if (this.cursors.up.isDown || this.wasd.W.isDown) {
       this.velocity.add(forward.clone().scale(PLAYER.thrust * dt));
@@ -287,20 +293,12 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
       this.velocity.add(forward.clone().scale(-PLAYER.reverseThrust * dt));
     }
 
-    if (Phaser.Input.Keyboard.JustDown(this.wasd.A)) {
-      this.velocity.add(lateral.clone().scale(-PLAYER.lateralNudgeImpulse));
-    }
-
-    if (Phaser.Input.Keyboard.JustDown(this.wasd.D)) {
-      this.velocity.add(lateral.clone().scale(PLAYER.lateralNudgeImpulse));
-    }
-
     this.velocity.scale(Math.pow(PLAYER.damping, dt * 60));
     this.velocity.limit(this.maxSpeed);
     this.playerPosition.add(this.velocity.clone().scale(dt));
 
     this.player.setPosition(this.playerPosition.x, this.playerPosition.y);
-    this.player.rotation = angle + Math.PI / 2;
+    this.player.rotation = this.playerHeading + Math.PI / 2;
     this.shieldRing.setPosition(this.playerPosition.x, this.playerPosition.y);
     this.updatePlayerChargeIndicatorPositions();
   }
@@ -319,6 +317,7 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     body.strokePath();
 
     this.player = this.add.container(this.playerPosition.x, this.playerPosition.y, [body]);
+    this.player.rotation = this.playerHeading + Math.PI / 2;
     this.shieldRing = this.add.circle(this.playerPosition.x, this.playerPosition.y, 24);
     this.shieldRing.setStrokeStyle(3, 0x6fb3ff, 0);
     this.shieldRing.setFillStyle(0x6fb3ff, 0);
@@ -412,12 +411,14 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.spawnTimer = 0;
     this.fireTimer = 0;
     this.rocketTimer = 0;
-    this.laserTimer = 0;
+    this.railGunTimer = 0;
     this.empTimer = 0;
     this.playerPosition.set(GAME_WIDTH / 2, GAME_HEIGHT / 2);
     this.player.setPosition(this.playerPosition.x, this.playerPosition.y);
     this.cameras.main.centerOn(this.playerPosition.x, this.playerPosition.y);
     this.velocity.set(0, 0);
+    this.playerHeading = -Math.PI / 2;
+    this.player.rotation = this.playerHeading + Math.PI / 2;
 
     resetProgression(this);
     this.shieldRing.setStrokeStyle(3, 0x6fb3ff, 0);
@@ -436,8 +437,8 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
       rocket.graphic.destroy();
       rocket.trail.destroy();
     }
-    for (const laser of this.lasers) {
-      laser.graphic.destroy();
+    for (const shot of this.railGunShots) {
+      shot.graphic.destroy();
     }
     for (const pulse of this.empPulses) {
       pulse.graphic.destroy();
@@ -449,7 +450,7 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.enemies = [];
     this.bullets = [];
     this.rockets = [];
-    this.lasers = [];
+    this.railGunShots = [];
     this.empPulses = [];
     this.xpGems = [];
     this.upgradeOptions = [];
@@ -562,20 +563,19 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.cleanupDeadEnemies();
   }
 
-  private updateLasers(dt: number): void {
-    if (this.laserLevel >= 0) {
-      this.laserTimer += dt;
-      while (this.laserTimer >= this.laserCooldown) {
-        this.laserTimer -= this.laserCooldown;
-        const pointer = this.input.activePointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
-        this.lasers.push(
-          fireLaser(
+  private updateRailGun(dt: number): void {
+    if (this.railGunLevel >= 0) {
+      this.railGunTimer += dt;
+      while (this.railGunTimer >= this.railGunCooldown) {
+        this.railGunTimer -= this.railGunCooldown;
+        this.railGunShots.push(
+          fireRailGun(
             this,
             this.playerPosition.x,
             this.playerPosition.y,
-            pointer.x,
-            pointer.y,
-            this.laserDamage,
+            Math.cos(this.playerHeading),
+            Math.sin(this.playerHeading),
+            this.railGunDamage,
             this.enemies,
             (x, y) => this.spawnHitFlash(x, y),
           ),
@@ -583,7 +583,7 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
         this.cleanupDeadEnemies();
       }
     }
-    this.lasers = updateLasers(this.lasers, dt);
+    this.railGunShots = updateRailGunShots(this.railGunShots, dt);
   }
 
   private updateEmp(dt: number): void {
@@ -697,13 +697,13 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.hud.shieldBarFill.setScale(shieldRatio, 1);
     this.hud.shieldBarFill.setFillStyle(0x7fc1ff, shieldUnlocked ? 0.95 : 0.16);
 
-    const laserUnlocked = this.laserLevel >= 0 && this.laserCooldown < 999;
-    const laserRatio = laserUnlocked
-      ? Phaser.Math.Clamp(this.laserTimer / this.laserCooldown, 0, 1)
+    const railGunUnlocked = this.railGunLevel >= 0 && this.railGunCooldown < 999;
+    const railGunRatio = railGunUnlocked
+      ? Phaser.Math.Clamp(this.railGunTimer / this.railGunCooldown, 0, 1)
       : 0;
-    this.drawChargeArc(this.hud.laserChargeBack, 0x5cf2ff, laserUnlocked ? 0.22 : 0.1, 1, "left");
-    this.drawChargeArc(this.hud.laserChargeFill, 0x6ef8ff, laserUnlocked ? 0.4 + laserRatio * 0.55 : 0.12, laserRatio, "left");
-    this.hud.laserLabel.setAlpha(laserUnlocked ? 0.5 + laserRatio * 0.5 : 0.24);
+    this.drawChargeArc(this.hud.railGunChargeBack, 0x5cf2ff, railGunUnlocked ? 0.22 : 0.1, 1, "left");
+    this.drawChargeArc(this.hud.railGunChargeFill, 0x6ef8ff, railGunUnlocked ? 0.4 + railGunRatio * 0.55 : 0.12, railGunRatio, "left");
+    this.hud.railGunLabel.setAlpha(railGunUnlocked ? 0.5 + railGunRatio * 0.5 : 0.24);
 
     const rocketUnlocked = this.rocketsLevel >= 0 && this.rocketCooldown < 999;
     const rocketRatio = rocketUnlocked
@@ -715,10 +715,10 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
   }
 
   private updatePlayerChargeIndicatorPositions(): void {
-    this.hud.laserLabel.setPosition(this.playerPosition.x - 34, this.playerPosition.y - 28);
+    this.hud.railGunLabel.setPosition(this.playerPosition.x - 34, this.playerPosition.y - 28);
     this.hud.rocketLabel.setPosition(this.playerPosition.x + 34, this.playerPosition.y - 28);
-    this.hud.laserChargeBack.setPosition(this.playerPosition.x, this.playerPosition.y);
-    this.hud.laserChargeFill.setPosition(this.playerPosition.x, this.playerPosition.y);
+    this.hud.railGunChargeBack.setPosition(this.playerPosition.x, this.playerPosition.y);
+    this.hud.railGunChargeFill.setPosition(this.playerPosition.x, this.playerPosition.y);
     this.hud.rocketChargeBack.setPosition(this.playerPosition.x, this.playerPosition.y);
     this.hud.rocketChargeFill.setPosition(this.playerPosition.x, this.playerPosition.y);
   }
