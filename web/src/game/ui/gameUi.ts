@@ -14,6 +14,12 @@ export type Hud = {
   healthBarFill: Phaser.GameObjects.Rectangle;
   shieldBarBack: Phaser.GameObjects.Rectangle;
   shieldBarFill: Phaser.GameObjects.Rectangle;
+  laserLabel: Phaser.GameObjects.Text;
+  laserChargeBack: Phaser.GameObjects.Graphics;
+  laserChargeFill: Phaser.GameObjects.Graphics;
+  rocketLabel: Phaser.GameObjects.Text;
+  rocketChargeBack: Phaser.GameObjects.Graphics;
+  rocketChargeFill: Phaser.GameObjects.Graphics;
   prompt: Phaser.GameObjects.Text;
 };
 
@@ -121,6 +127,30 @@ export function createHud(scene: Phaser.Scene): Hud {
     .setOrigin(0, 0)
     .setScrollFactor(0);
 
+  const laserLabel = scene.add
+    .text(GAME_WIDTH / 2 - 34, GAME_HEIGHT / 2 - 28, "L", {
+      fontFamily: "Trebuchet MS, sans-serif",
+      fontSize: "16px",
+      color: "#5cf2ff",
+    })
+    .setOrigin(0.5, 1)
+    .setAlpha(0.5);
+
+  const laserChargeBack = scene.add.graphics().setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2);
+  const laserChargeFill = scene.add.graphics().setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2);
+
+  const rocketLabel = scene.add
+    .text(GAME_WIDTH / 2 + 34, GAME_HEIGHT / 2 - 28, "R", {
+      fontFamily: "Trebuchet MS, sans-serif",
+      fontSize: "16px",
+      color: "#ffb35a",
+    })
+    .setOrigin(0.5, 1)
+    .setAlpha(0.5);
+
+  const rocketChargeBack = scene.add.graphics().setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2);
+  const rocketChargeFill = scene.add.graphics().setPosition(GAME_WIDTH / 2, GAME_HEIGHT / 2);
+
   const prompt = scene.add
     .text(24, GAME_HEIGHT - 34, "WASD / Arrows to move   Mouse to aim   Auto-fire online", {
       fontFamily: "Trebuchet MS, sans-serif",
@@ -141,6 +171,12 @@ export function createHud(scene: Phaser.Scene): Hud {
     healthBarFill,
     shieldBarBack,
     shieldBarFill,
+    laserLabel,
+    laserChargeBack,
+    laserChargeFill,
+    rocketLabel,
+    rocketChargeBack,
+    rocketChargeFill,
     prompt,
   };
 }

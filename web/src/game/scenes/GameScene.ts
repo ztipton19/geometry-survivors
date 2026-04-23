@@ -147,6 +147,12 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.hud.healthBarFill.setVisible(visible);
     this.hud.shieldBarBack.setVisible(visible);
     this.hud.shieldBarFill.setVisible(visible);
+    this.hud.laserLabel.setVisible(visible);
+    this.hud.laserChargeBack.setVisible(visible);
+    this.hud.laserChargeFill.setVisible(visible);
+    this.hud.rocketLabel.setVisible(visible);
+    this.hud.rocketChargeBack.setVisible(visible);
+    this.hud.rocketChargeFill.setVisible(visible);
   }
 
   create(): void {
@@ -296,6 +302,7 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.player.setPosition(this.playerPosition.x, this.playerPosition.y);
     this.player.rotation = angle + Math.PI / 2;
     this.shieldRing.setPosition(this.playerPosition.x, this.playerPosition.y);
+    this.updatePlayerChargeIndicatorPositions();
   }
 
   private createPlayer(): void {
@@ -315,6 +322,7 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.shieldRing = this.add.circle(this.playerPosition.x, this.playerPosition.y, 24);
     this.shieldRing.setStrokeStyle(3, 0x6fb3ff, 0);
     this.shieldRing.setFillStyle(0x6fb3ff, 0);
+    this.updatePlayerChargeIndicatorPositions();
   }
 
   private createInfiniteBackground(): void {
@@ -413,6 +421,7 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
 
     resetProgression(this);
     this.shieldRing.setStrokeStyle(3, 0x6fb3ff, 0);
+    this.updatePlayerChargeIndicatorPositions();
     this.updateHud();
   }
 
@@ -687,6 +696,63 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.hud.shieldBarBack.setStrokeStyle(1, 0x86bdff, shieldUnlocked ? 0.65 : 0.22);
     this.hud.shieldBarFill.setScale(shieldRatio, 1);
     this.hud.shieldBarFill.setFillStyle(0x7fc1ff, shieldUnlocked ? 0.95 : 0.16);
+
+    const laserUnlocked = this.laserLevel >= 0 && this.laserCooldown < 999;
+    const laserRatio = laserUnlocked
+      ? Phaser.Math.Clamp(this.laserTimer / this.laserCooldown, 0, 1)
+      : 0;
+    this.drawChargeArc(this.hud.laserChargeBack, 0x5cf2ff, laserUnlocked ? 0.22 : 0.1, 1, "left");
+    this.drawChargeArc(this.hud.laserChargeFill, 0x6ef8ff, laserUnlocked ? 0.4 + laserRatio * 0.55 : 0.12, laserRatio, "left");
+    this.hud.laserLabel.setAlpha(laserUnlocked ? 0.5 + laserRatio * 0.5 : 0.24);
+
+    const rocketUnlocked = this.rocketsLevel >= 0 && this.rocketCooldown < 999;
+    const rocketRatio = rocketUnlocked
+      ? Phaser.Math.Clamp(this.rocketTimer / this.rocketCooldown, 0, 1)
+      : 0;
+    this.drawChargeArc(this.hud.rocketChargeBack, 0xffb35a, rocketUnlocked ? 0.22 : 0.1, 1, "right");
+    this.drawChargeArc(this.hud.rocketChargeFill, 0xffa146, rocketUnlocked ? 0.4 + rocketRatio * 0.55 : 0.12, rocketRatio, "right");
+    this.hud.rocketLabel.setAlpha(rocketUnlocked ? 0.5 + rocketRatio * 0.5 : 0.24);
+  }
+
+  private updatePlayerChargeIndicatorPositions(): void {
+    this.hud.laserLabel.setPosition(this.playerPosition.x - 34, this.playerPosition.y - 28);
+    this.hud.rocketLabel.setPosition(this.playerPosition.x + 34, this.playerPosition.y - 28);
+    this.hud.laserChargeBack.setPosition(this.playerPosition.x, this.playerPosition.y);
+    this.hud.laserChargeFill.setPosition(this.playerPosition.x, this.playerPosition.y);
+    this.hud.rocketChargeBack.setPosition(this.playerPosition.x, this.playerPosition.y);
+    this.hud.rocketChargeFill.setPosition(this.playerPosition.x, this.playerPosition.y);
+  }
+
+  private drawChargeArc(
+    graphic: Phaser.GameObjects.Graphics,
+    color: number,
+    alpha: number,
+    ratio: number,
+    side: "left" | "right",
+  ): void {
+    graphic.clear();
+    if (ratio <= 0) {
+      return;
+    }
+
+    const radius = 31;
+    const fullSweep = 104;
+    const startDegrees = side === "left" ? 128 : -52;
+    const endDegrees = side === "left" ? 232 : 52;
+    const fillStart = side === "left" ? endDegrees - fullSweep * ratio : startDegrees;
+    const fillEnd = side === "left" ? endDegrees : startDegrees + fullSweep * ratio;
+
+    graphic.lineStyle(4, color, alpha);
+    graphic.beginPath();
+    graphic.arc(
+      0,
+      0,
+      radius,
+      Phaser.Math.DegToRad(ratio >= 1 ? startDegrees : fillStart),
+      Phaser.Math.DegToRad(ratio >= 1 ? endDegrees : fillEnd),
+      false,
+    );
+    graphic.strokePath();
   }
 
   private formatElapsed(): string {
