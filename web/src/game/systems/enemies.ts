@@ -4,6 +4,7 @@ import { COLORS, ENEMY, GAME_HEIGHT, GAME_WIDTH } from "../constants/settings";
 import {
   chooseEnemySides,
   ENEMY_SCALING,
+  getBossSides,
   type EnemyProfileKey,
   shouldSpawnBoss,
 } from "../data/enemies";
@@ -32,12 +33,12 @@ export function spawnEnemy(
 
   const minutes = elapsed / 60;
   const isBoss = shouldSpawnBoss(minutes);
-  const sides = isBoss ? 8 : chooseEnemySides(minutes);
+  const sides = isBoss ? getBossSides(minutes) : chooseEnemySides(minutes);
   const scaling = ENEMY_SCALING[isBoss ? "boss" : (sides as EnemyProfileKey)];
 
-  const baseSpeed = ENEMY.baseSpeed + Math.min(ENEMY.speedMaxBonus, elapsed * ENEMY.speedPerSecond);
-  const baseHp = ENEMY.baseHp + Math.min(ENEMY.hpMaxBonus, elapsed * ENEMY.hpPerSecond);
-  const baseDamage = ENEMY.baseDamage + Math.min(ENEMY.damageMaxBonus, elapsed * ENEMY.damagePerSecond);
+  const baseSpeed = ENEMY.baseSpeed;
+  const baseHp = ENEMY.baseHp;
+  const baseDamage = ENEMY.baseDamage;
   const radius = ENEMY.radius * scaling.radius;
 
   return {

@@ -62,12 +62,6 @@ export const ENEMY = {
   spawnIntervalStart: 0.75,
   spawnIntervalMin: 0.18,
   spawnIntervalDecay: 0.0028,
-  speedPerSecond: 0.08,
-  speedMaxBonus: 7.5,
-  hpPerSecond: 0.32,
-  hpMaxBonus: 70,
-  damagePerSecond: 0.025,
-  damageMaxBonus: 16,
   contactDamageCooldown: 0.45,
   contactDamageRate: 18,
 } as const;
