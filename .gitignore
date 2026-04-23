@@ -91,6 +91,7 @@ desktop.ini
 # highscores.dat
 
 # Web migration
+node_modules/
 web/node_modules/
 web/dist/
 

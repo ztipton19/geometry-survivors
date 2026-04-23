@@ -1,21 +1,19 @@
-# Clone Protocol
+# Geometry Survivors
 
-A neon-flavored top-down survival prototype inspired by arena shooters. The player starts with a mining laser that locks onto nearby enemies, ramps damage over time, and swaps targets as threats are eliminated.
+Browser-first Phaser + TypeScript game prototype. The active project lives in [`web/`](/Users/ztiptonuark.edu/Documents/GitHub/geometry-survivors/web), and the older Python prototype and forked design material are archived under [`archive/`](/Users/ztiptonuark.edu/Documents/GitHub/geometry-survivors/archive).
 
 ## Run
 
 ```bash
-PYTHONPATH=src python -m main
+npm install
+npm run dev
 ```
 
-## Controls
+The root scripts forward to the Phaser app in `web/`.
 
-- Move: WASD or arrow keys
-- Restart after win/lose: `R`
-- Toggle debug overlay: `F3` (tune movement/combat params live)
-- Quit: `Esc`
+## Project Layout
 
-## Requirements
-
-- Python 3.11+
-- pygame (see `requirements.txt`)
+- `web/`: active Phaser game
+- `v2-build-plan.md`: current build plan for the web version
+- `archive/legacy-python/`: old Python prototype and related assets
+- `archive/legacy-docs/`: earlier design documents and migration notes kept for reference

@@ -1,6 +1,8 @@
 # CLONE PROTOCOL - V2 BUILD PLAN
 ## From Survivor to Tactical: The Transition
 
+> Repo status note: the active implementation is now the Phaser + TypeScript game in `web/`. The old Python prototype has been archived for reference, and the Python-derived loadout data we still care about lives alongside the web data files.
+
 ---
 
 ## Overview
@@ -89,7 +91,7 @@ This document maps the path from the current v1 prototype (Vampire Survivors-sty
 #### 1A: Manual Weapons with Ammo (Days 1-2)
 
 **Implement finite ammo system:**
-```python
+```ts
 class WeaponState:
     def __init__(self, weapon_data):
         self.name = weapon_data['name']
@@ -450,32 +452,28 @@ ThreatBoard
 ### File Structure (New/Modified)
 
 ```
-src/game/
+web/src/game/
 ├── data/
 │   ├── modules.json          # NEW: All module definitions
 │   ├── ships.json             # NEW: All ship definitions
-│   └── save_data.json         # NEW: Player progress (generated)
-├── entities/
-│   ├── player.py              # MODIFY: Add fuel, ammo, fitting
-│   ├── enemy.py               # MODIFY: Tactical AI, approach vectors
-│   ├── bullet.py              # MODIFY: Weapon-specific projectiles
-│   └── ...
+│   └── saveData.json          # NEW: Player progress (generated)
+├── scenes/
+│   ├── BootScene.ts           # Existing boot flow
+│   └── GameScene.ts           # MODIFY: New game state flow
 ├── systems/
-│   ├── combat.py              # MODIFY: Manual fire, weapon mounting
-│   ├── spawner.py             # MODIFY: Multi-vector timed spawning
-│   ├── collisions.py          # MODIFY: Remove XP drops, adjust damage
-│   ├── threat_board.py        # NEW: Threat tracking and display
-│   ├── fitting.py             # NEW: Ship fitting logic
-│   ├── progression.py         # MODIFY: Data earning, extraction
-│   └── save_system.py         # NEW: Save/load
-├── screens/
-│   ├── fitting_screen.py      # NEW: Pre-run fitting UI
-│   ├── debrief_screen.py      # NEW: Post-run stats
-│   ├── data_archive_screen.py # NEW: Module unlock shop
-│   └── terminal_screen.py     # NEW: Narrative logs (later phase)
-├── world.py                   # MODIFY: New game state flow
-├── settings.py                # MODIFY: New tuning values
-└── debug_overlay.py           # MODIFY: Add ammo/fuel debug tools
+│   ├── combat.ts              # MODIFY: Manual fire, weapon mounting
+│   ├── enemies.ts             # MODIFY: Multi-vector timed spawning
+│   ├── progression.ts         # MODIFY: Data earning, extraction
+│   ├── fitting.ts             # NEW: Ship fitting logic
+│   └── saveSystem.ts          # NEW: Save/load
+├── ui/
+│   ├── fittingScreen.ts       # NEW: Pre-run fitting UI
+│   ├── debriefScreen.ts       # NEW: Post-run stats
+│   ├── dataArchiveScreen.ts   # NEW: Module unlock shop
+│   └── ...
+├── constants/
+│   └── settings.ts            # MODIFY: New tuning values
+└── main.ts                    # Entry point
 ```
 
 ---
