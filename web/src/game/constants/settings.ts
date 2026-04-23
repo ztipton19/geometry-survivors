@@ -15,9 +15,11 @@ export const COLORS = {
 
 export const PLAYER = {
   radius: 12,
-  thrust: 240,
-  damping: 0.9,
-  maxSpeed: 220,
+  thrust: 540,
+  reverseThrust: 320,
+  lateralNudgeImpulse: 110,
+  damping: 0.985,
+  maxSpeed: 320,
   maxHp: 100,
   fireCooldown: 0.4,
   bulletDamage: 10,
@@ -51,7 +53,7 @@ export const EMP = {
 } as const;
 
 export const ENEMY = {
-  baseSpeed: 12.9375,
+  baseSpeed: 10.5,
   baseHp: 22,
   baseDamage: 22,
   baseXp: 7,
@@ -60,8 +62,8 @@ export const ENEMY = {
   spawnIntervalStart: 0.75,
   spawnIntervalMin: 0.18,
   spawnIntervalDecay: 0.0028,
-  speedPerSecond: 0.12,
-  speedMaxBonus: 10.5,
+  speedPerSecond: 0.08,
+  speedMaxBonus: 7.5,
   hpPerSecond: 0.32,
   hpMaxBonus: 70,
   damagePerSecond: 0.025,
@@ -71,7 +73,12 @@ export const ENEMY = {
 } as const;
 
 export const XP_GEM = {
-  lifetime: 30,
+  maxLooseGems: 400,
   magnetSpeed: 600,
   pickupRadius: 20,
+  normalRadius: 6,
+  overflowRadius: 10,
+  overflowMergeRadius: 850,
+  overflowSpawnMinRadius: 300,
+  overflowSpawnMaxRadius: 650,
 } as const;

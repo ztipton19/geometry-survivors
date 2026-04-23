@@ -4,20 +4,26 @@ import { COLORS, GAME_HEIGHT, GAME_WIDTH } from "../constants/settings";
 import { CARD_COLORS, type UpgradeDefinition, type UpgradeId, type UpgradeRuntime } from "../data/upgrades";
 
 export type Hud = {
+  title: Phaser.GameObjects.Text;
   timer: Phaser.GameObjects.Text;
   level: Phaser.GameObjects.Text;
-  xp: Phaser.GameObjects.Text;
+  xpBarBack: Phaser.GameObjects.Rectangle;
+  xpBarFill: Phaser.GameObjects.Rectangle;
   kills: Phaser.GameObjects.Text;
-  hp: Phaser.GameObjects.Text;
-  status: Phaser.GameObjects.Text;
+  healthBarBack: Phaser.GameObjects.Rectangle;
+  healthBarFill: Phaser.GameObjects.Rectangle;
+  shieldBarBack: Phaser.GameObjects.Rectangle;
+  shieldBarFill: Phaser.GameObjects.Rectangle;
   prompt: Phaser.GameObjects.Text;
 };
 
 export type UpgradeCard = {
   container: Phaser.GameObjects.Container;
   background: Phaser.GameObjects.Rectangle;
+  number: Phaser.GameObjects.Text;
   title: Phaser.GameObjects.Text;
   detail: Phaser.GameObjects.Text;
+  hint: Phaser.GameObjects.Text;
   bounds: Phaser.Geom.Rectangle;
 };
 
@@ -30,56 +36,90 @@ export type Overlay = {
   footer: Phaser.GameObjects.Text;
 };
 
+function setCardVisible(card: UpgradeCard, visible: boolean): void {
+  card.container.setVisible(visible);
+  card.background.setVisible(visible);
+  card.number.setVisible(visible);
+  card.title.setVisible(visible);
+  card.detail.setVisible(visible);
+  card.hint.setVisible(visible);
+}
+
 export function createHud(scene: Phaser.Scene): Hud {
-  scene.add
+  const title = scene.add
     .text(24, 14, "GEOMETRY SURVIVORS", {
       fontFamily: "Trebuchet MS, sans-serif",
       fontSize: "28px",
       color: "#00ffff",
     })
-    .setShadow(0, 0, "#00ffff", 12, true, true);
+    .setShadow(0, 0, "#00ffff", 12, true, true)
+    .setScrollFactor(0);
 
   const timer = scene.add
-    .text(GAME_WIDTH - 24, 18, "15:00", {
+    .text(GAME_WIDTH / 2, 18, "15:00", {
       fontFamily: "Trebuchet MS, sans-serif",
       fontSize: "32px",
       color: "#ffff00",
     })
-    .setOrigin(1, 0)
-    .setShadow(0, 0, "#ffff00", 10, true, true);
+    .setOrigin(0.5, 0)
+    .setShadow(0, 0, "#ffff00", 10, true, true)
+    .setScrollFactor(0);
 
-  const level = scene.add.text(24, 56, "LVL 1", {
-    fontFamily: "Trebuchet MS, sans-serif",
-    fontSize: "18px",
-    color: "#f0f0f0",
-  });
-
-  const xp = scene.add.text(24, 82, "XP 0 / 90", {
-    fontFamily: "Trebuchet MS, sans-serif",
-    fontSize: "16px",
-    color: "#f0f0f0",
-  });
-
-  const kills = scene.add.text(24, 106, "KILLS 0", {
-    fontFamily: "Trebuchet MS, sans-serif",
-    fontSize: "16px",
-    color: "#ff3c3c",
-  });
-
-  const hp = scene.add.text(24, 130, "HP 100 / 100", {
-    fontFamily: "Trebuchet MS, sans-serif",
-    fontSize: "16px",
-    color: "#00ff78",
-  });
-
-  const status = scene.add
-    .text(GAME_WIDTH - 24, 68, "", {
+  const level = scene.add
+    .text(24, 24, "LEVEL: 1", {
       fontFamily: "Trebuchet MS, sans-serif",
-      fontSize: "14px",
-      color: "#d0d7de",
-      align: "right",
+      fontSize: "18px",
+      color: "#f0f0f0",
     })
-    .setOrigin(1, 0);
+    .setScrollFactor(0);
+
+  const xpBarBack = scene.add
+    .rectangle(32, 52, 14, 112, 0x0b1722, 0.75)
+    .setOrigin(0, 0)
+    .setStrokeStyle(2, 0x6be48d, 0.55)
+    .setScrollFactor(0);
+
+  const xpBarFill = scene.add
+    .rectangle(35, 161, 8, 0, 0x8ef5a8, 0.92)
+    .setOrigin(0, 1)
+    .setScrollFactor(0);
+
+  const barY = 28;
+  const barWidth = 250;
+  const barHeight = 14;
+  const barGap = 74;
+  const timerGap = 70;
+
+  const healthBarBack = scene.add
+    .rectangle(GAME_WIDTH / 2 - timerGap - barWidth, barY, barWidth, barHeight, 0x3b1010, 0.55)
+    .setOrigin(0, 0)
+    .setStrokeStyle(1, 0xff8f8f, 0.55)
+    .setScrollFactor(0);
+
+  const healthBarFill = scene.add
+    .rectangle(GAME_WIDTH / 2 - timerGap - barWidth + 2, barY + 2, barWidth - 4, barHeight - 4, 0xff4e4e, 0.9)
+    .setOrigin(0, 0)
+    .setScrollFactor(0);
+
+  const kills = scene.add
+    .text(GAME_WIDTH - 24, 24, "Targets Eliminated: 0", {
+      fontFamily: "Trebuchet MS, sans-serif",
+      fontSize: "16px",
+      color: "#ff3c3c",
+    })
+    .setOrigin(1, 0)
+    .setScrollFactor(0);
+
+  const shieldBarBack = scene.add
+    .rectangle(GAME_WIDTH / 2 + timerGap, barY, barWidth, barHeight, 0x10233d, 0.22)
+    .setOrigin(0, 0)
+    .setStrokeStyle(1, 0x86bdff, 0.4)
+    .setScrollFactor(0);
+
+  const shieldBarFill = scene.add
+    .rectangle(GAME_WIDTH / 2 + timerGap + 2, barY + 2, barWidth - 4, barHeight - 4, 0x7fc1ff, 0.2)
+    .setOrigin(0, 0)
+    .setScrollFactor(0);
 
   const prompt = scene.add
     .text(24, GAME_HEIGHT - 34, "WASD / Arrows to move   Mouse to aim   Auto-fire online", {
@@ -87,9 +127,22 @@ export function createHud(scene: Phaser.Scene): Hud {
       fontSize: "16px",
       color: "#00ff78",
     })
-    .setAlpha(0.85);
+    .setAlpha(0.85)
+    .setScrollFactor(0);
 
-  return { timer, level, xp, kills, hp, status, prompt };
+  return {
+    title,
+    timer,
+    level,
+    xpBarBack,
+    xpBarFill,
+    kills,
+    healthBarBack,
+    healthBarFill,
+    shieldBarBack,
+    shieldBarFill,
+    prompt,
+  };
 }
 
 export function createOverlay(scene: Phaser.Scene): Overlay {
@@ -177,7 +230,7 @@ export function createOverlay(scene: Phaser.Scene): Overlay {
     const container = scene.add
       .container(0, 0, [background, number, titleText, detail, hint])
       .setVisible(false);
-    cards.push({ container, background, title: titleText, detail, bounds });
+    cards.push({ container, background, number, title: titleText, detail, hint, bounds });
   }
 
   const container = scene.add.container(0, 0, [
@@ -188,6 +241,7 @@ export function createOverlay(scene: Phaser.Scene): Overlay {
     ...cards.map((card) => card.container),
   ]);
   container.setDepth(20);
+  container.setScrollFactor(0);
   container.setVisible(false);
 
   return { container, backdrop, title, subtitle, cards, footer };
@@ -206,7 +260,7 @@ export function showMenuOverlay(overlay: Overlay): void {
     .setText("Current web slice: core combat, full weapon kit, and survival upgrades")
     .setVisible(true);
   for (const card of overlay.cards) {
-    card.container.setVisible(false);
+    setCardVisible(card, false);
   }
 }
 
@@ -227,7 +281,7 @@ export function showLevelUpOverlay<TScene extends UpgradeRuntime>(
     const card = overlay.cards[i];
     const id = options[i];
     if (!id) {
-      card.container.setVisible(false);
+      setCardVisible(card, false);
       continue;
     }
 
@@ -241,7 +295,7 @@ export function showLevelUpOverlay<TScene extends UpgradeRuntime>(
         `Next: ${definition.nextDescription(scene, nextLevel)}`,
       ].join("\n"),
     );
-    card.container.setVisible(true);
+    setCardVisible(card, true);
   }
 }
 
@@ -257,6 +311,6 @@ export function showEndOverlay(
   overlay.subtitle.setText(subtitle).setVisible(true);
   overlay.footer.setText("Enter or R to restart").setVisible(true);
   for (const card of overlay.cards) {
-    card.container.setVisible(false);
+    setCardVisible(card, false);
   }
 }

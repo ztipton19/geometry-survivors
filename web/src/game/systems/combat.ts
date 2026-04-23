@@ -25,11 +25,24 @@ export function findNearestEnemy(
   enemies: EnemyModel[],
   playerX: number,
   playerY: number,
+  camX: number = Number.NEGATIVE_INFINITY,
+  camY: number = Number.NEGATIVE_INFINITY,
+  camW: number = Number.POSITIVE_INFINITY,
+  camH: number = Number.POSITIVE_INFINITY,
 ): EnemyModel | null {
   let best: EnemyModel | null = null;
   let bestDistanceSquared = Number.POSITIVE_INFINITY;
 
   for (const enemy of enemies) {
+    const visible =
+      enemy.x + enemy.radius >= camX &&
+      enemy.x - enemy.radius <= camX + camW &&
+      enemy.y + enemy.radius >= camY &&
+      enemy.y - enemy.radius <= camY + camH;
+    if (!visible) {
+      continue;
+    }
+
     const dx = enemy.x - playerX;
     const dy = enemy.y - playerY;
     const distanceSquared = dx * dx + dy * dy;
@@ -72,6 +85,10 @@ export function updateBullets(
   enemies: EnemyModel[],
   dt: number,
   onHit: HitCallback,
+  camX: number = 0,
+  camY: number = 0,
+  camW: number = GAME_WIDTH,
+  camH: number = GAME_HEIGHT,
 ): BulletModel[] {
   const remainingBullets: BulletModel[] = [];
 
@@ -100,10 +117,10 @@ export function updateBullets(
     }
 
     const insideBounds =
-      bullet.x >= -80 &&
-      bullet.x <= GAME_WIDTH + 80 &&
-      bullet.y >= -80 &&
-      bullet.y <= GAME_HEIGHT + 80;
+      bullet.x >= camX - 80 &&
+      bullet.x <= camX + camW + 80 &&
+      bullet.y >= camY - 80 &&
+      bullet.y <= camY + camH + 80;
     if (bullet.ttl > 0 && insideBounds) {
       remainingBullets.push(bullet);
     } else {
@@ -191,7 +208,8 @@ export function updateRockets(
     for (const enemy of enemies) {
       const dx = enemy.x - rocket.x;
       const dy = enemy.y - rocket.y;
-      if (dx * dx + dy * dy <= rocket.splashRadius ** 2) {
+      const splashHitRadius = rocket.splashRadius + enemy.radius;
+      if (dx * dx + dy * dy <= splashHitRadius * splashHitRadius) {
         enemy.hp -= rocket.damage;
         onHit(enemy.x, enemy.y);
       }

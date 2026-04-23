@@ -54,7 +54,6 @@ import {
 import {
   applyPlayerDamage,
   awardXp,
-  buildStatusText,
   generateUpgradeOptions,
   getUpgradeState,
   resetProgression,
@@ -130,14 +129,32 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
 
   private readonly playerPosition = new Phaser.Math.Vector2(GAME_WIDTH / 2, GAME_HEIGHT / 2);
 
+  private gridTile!: Phaser.GameObjects.TileSprite;
+  private starLayers: { tile: Phaser.GameObjects.TileSprite; parallax: number }[] = [];
+
   constructor() {
     super("game");
   }
 
+  private setRunHudVisible(visible: boolean): void {
+    this.hud.timer.setVisible(visible);
+    this.hud.level.setVisible(visible);
+    this.hud.xpBarBack.setVisible(visible);
+    this.hud.xpBarFill.setVisible(visible);
+    this.hud.kills.setVisible(visible);
+    this.hud.healthBarBack.setVisible(visible);
+    this.hud.healthBarFill.setVisible(visible);
+    this.hud.shieldBarBack.setVisible(visible);
+    this.hud.shieldBarFill.setVisible(visible);
+  }
+
   create(): void {
-    this.drawBackdrop();
+    this.createInfiniteBackground();
     this.hud = createHud(this);
+    this.setRunHudVisible(false);
+    this.hud.title.setVisible(false);
     this.createPlayer();
+    this.cameras.main.startFollow(this.player, false, 1, 1);
     this.overlay = createOverlay(this);
 
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -186,6 +203,7 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.updateEmp(dt);
     this.updateXpGems(dt);
     this.updateShield(dt);
+    this.updateBackground();
 
     if (this.playerHp <= 0) {
       this.playerHp = 0;
@@ -230,32 +248,6 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
   }
 
   private updateMovement(dt: number): void {
-    const move = new Phaser.Math.Vector2(
-      Number(this.cursors.right.isDown || this.wasd.D.isDown) -
-        Number(this.cursors.left.isDown || this.wasd.A.isDown),
-      Number(this.cursors.down.isDown || this.wasd.S.isDown) -
-        Number(this.cursors.up.isDown || this.wasd.W.isDown),
-    );
-
-    if (move.lengthSq() > 0) {
-      move.normalize();
-      this.velocity.add(move.scale(PLAYER.thrust * dt));
-    }
-
-    this.velocity.scale(Math.pow(PLAYER.damping, dt * 60));
-    this.velocity.limit(this.maxSpeed);
-    this.playerPosition.add(this.velocity.clone().scale(dt));
-    this.playerPosition.x = Phaser.Math.Clamp(
-      this.playerPosition.x,
-      PLAYER.radius * 2,
-      GAME_WIDTH - PLAYER.radius * 2,
-    );
-    this.playerPosition.y = Phaser.Math.Clamp(
-      this.playerPosition.y,
-      PLAYER.radius * 2,
-      GAME_HEIGHT - PLAYER.radius * 2,
-    );
-
     const pointer = this.input.activePointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
     const angle = Phaser.Math.Angle.Between(
       this.playerPosition.x,
@@ -263,6 +255,28 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
       pointer.x,
       pointer.y,
     );
+    const forward = new Phaser.Math.Vector2(Math.cos(angle), Math.sin(angle));
+    const lateral = new Phaser.Math.Vector2(-forward.y, forward.x);
+
+    if (this.cursors.up.isDown || this.wasd.W.isDown) {
+      this.velocity.add(forward.clone().scale(PLAYER.thrust * dt));
+    }
+
+    if (this.cursors.down.isDown || this.wasd.S.isDown) {
+      this.velocity.add(forward.clone().scale(-PLAYER.reverseThrust * dt));
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.wasd.A)) {
+      this.velocity.add(lateral.clone().scale(-PLAYER.lateralNudgeImpulse));
+    }
+
+    if (Phaser.Input.Keyboard.JustDown(this.wasd.D)) {
+      this.velocity.add(lateral.clone().scale(PLAYER.lateralNudgeImpulse));
+    }
+
+    this.velocity.scale(Math.pow(PLAYER.damping, dt * 60));
+    this.velocity.limit(this.maxSpeed);
+    this.playerPosition.add(this.velocity.clone().scale(dt));
 
     this.player.setPosition(this.playerPosition.x, this.playerPosition.y);
     this.player.rotation = angle + Math.PI / 2;
@@ -282,38 +296,84 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     body.fillPath();
     body.strokePath();
 
-    const glow = this.add.graphics();
-    glow.lineStyle(2, COLORS.neonCyan, 0.45);
-    glow.strokeCircle(0, 8, 16);
-
-    this.player = this.add.container(this.playerPosition.x, this.playerPosition.y, [glow, body]);
+    this.player = this.add.container(this.playerPosition.x, this.playerPosition.y, [body]);
     this.shieldRing = this.add.circle(this.playerPosition.x, this.playerPosition.y, 24);
     this.shieldRing.setStrokeStyle(3, 0x6fb3ff, 0);
     this.shieldRing.setFillStyle(0x6fb3ff, 0);
   }
 
-  private drawBackdrop(): void {
-    const backdrop = this.add.graphics();
-    backdrop.fillGradientStyle(0x08121b, 0x08121b, COLORS.background, COLORS.background, 1);
-    backdrop.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-
-    const grid = this.add.graphics();
-    grid.lineStyle(1, COLORS.grid, 0.34);
-    for (let x = 0; x <= GAME_WIDTH; x += 40) {
-      grid.lineBetween(x, 0, x, GAME_HEIGHT);
+  private createInfiniteBackground(): void {
+    // Create grid tile texture
+    const gridSize = 40;
+    const gridKey = "__grid_tile";
+    if (!this.textures.exists(gridKey)) {
+      const canvas = this.textures.createCanvas(gridKey, gridSize, gridSize)!;
+      const ctx = canvas.getContext();
+      ctx.fillStyle = "#05070a";
+      ctx.fillRect(0, 0, gridSize, gridSize);
+      ctx.strokeStyle = "rgba(16,50,74,0.34)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(gridSize, 0);
+      ctx.lineTo(gridSize, gridSize);
+      ctx.moveTo(0, gridSize);
+      ctx.lineTo(gridSize, gridSize);
+      ctx.stroke();
+      canvas.refresh();
     }
-    for (let y = 0; y <= GAME_HEIGHT; y += 40) {
-      grid.lineBetween(0, y, GAME_WIDTH, y);
-    }
+    this.gridTile = this.add.tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, gridKey);
+    this.gridTile.setOrigin(0, 0);
+    this.gridTile.setDepth(-100);
+    this.gridTile.setScrollFactor(0);
 
-    const stars = this.add.graphics();
-    stars.fillStyle(COLORS.white, 0.8);
-    for (let i = 0; i < 120; i += 1) {
-      stars.fillCircle(
-        Phaser.Math.Between(0, GAME_WIDTH),
-        Phaser.Math.Between(0, GAME_HEIGHT),
-        Phaser.Math.FloatBetween(0.5, 1.6),
-      );
+    // Create parallax star layers
+    this.starLayers = [];
+    this.createStarLayer("__stars_far", 512, 200, 0.4, 0.8, 0.25, -90, 0.3);
+    this.createStarLayer("__stars_mid", 512, 80, 0.7, 1.2, 0.45, -80, 0.6);
+    this.createStarLayer("__stars_near", 512, 30, 1.0, 1.8, 0.65, -70, 1.0);
+  }
+
+  private createStarLayer(
+    key: string,
+    tileSize: number,
+    count: number,
+    minRadius: number,
+    maxRadius: number,
+    alpha: number,
+    depth: number,
+    parallax: number,
+  ): void {
+    if (!this.textures.exists(key)) {
+      const canvas = this.textures.createCanvas(key, tileSize, tileSize)!;
+      const ctx = canvas.getContext();
+      ctx.clearRect(0, 0, tileSize, tileSize);
+      for (let i = 0; i < count; i += 1) {
+        const x = Math.random() * tileSize;
+        const y = Math.random() * tileSize;
+        const r = minRadius + Math.random() * (maxRadius - minRadius);
+        const brightness = 150 + Math.floor(Math.random() * 105);
+        ctx.fillStyle = `rgba(${brightness}, ${brightness}, ${brightness}, ${alpha})`;
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      canvas.refresh();
+    }
+    const tile = this.add.tileSprite(0, 0, GAME_WIDTH, GAME_HEIGHT, key);
+    tile.setOrigin(0, 0);
+    tile.setDepth(depth);
+    tile.setScrollFactor(0);
+    this.starLayers.push({ tile, parallax });
+  }
+
+  private updateBackground(): void {
+    const scrollX = this.cameras.main.scrollX;
+    const scrollY = this.cameras.main.scrollY;
+    this.gridTile.tilePositionX = scrollX;
+    this.gridTile.tilePositionY = scrollY;
+    for (const { tile, parallax } of this.starLayers) {
+      tile.tilePositionX = scrollX * parallax;
+      tile.tilePositionY = scrollY * parallax;
     }
   }
 
@@ -321,6 +381,9 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.clearWorld();
     this.mode = "play";
     this.overlay.container.setVisible(false);
+    this.setRunHudVisible(true);
+    this.hud.title.setVisible(false);
+    this.hud.prompt.setVisible(false);
     this.elapsed = 0;
     this.remaining = ROUND_SECONDS;
     this.spawnTimer = 0;
@@ -330,12 +393,11 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     this.empTimer = 0;
     this.playerPosition.set(GAME_WIDTH / 2, GAME_HEIGHT / 2);
     this.player.setPosition(this.playerPosition.x, this.playerPosition.y);
+    this.cameras.main.centerOn(this.playerPosition.x, this.playerPosition.y);
     this.velocity.set(0, 0);
 
     resetProgression(this);
     this.shieldRing.setStrokeStyle(3, 0x6fb3ff, 0);
-
-    this.hud.prompt.setText("WASD / Arrows to move   Mouse to aim   Survive 15 minutes");
     this.updateHud();
   }
 
@@ -386,8 +448,8 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
       const dx = this.playerPosition.x - enemy.x;
       const dy = this.playerPosition.y - enemy.y;
       const distance = Math.max(0.001, Math.hypot(dx, dy));
-      enemy.x += (dx / distance) * enemy.speed * dt * 12;
-      enemy.y += (dy / distance) * enemy.speed * dt * 12;
+      enemy.x += (dx / distance) * enemy.speed * dt * 7;
+      enemy.y += (dy / distance) * enemy.speed * dt * 7;
       enemy.touchCooldown = Math.max(0, enemy.touchCooldown - dt);
 
       if (distance < enemy.radius + PLAYER.radius + 6 && enemy.touchCooldown <= 0) {
@@ -402,8 +464,22 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
   }
 
   private updateAutoFire(dt: number): void {
+    const cam = this.cameras.main;
+    const nearest = findNearestEnemy(
+      this.enemies,
+      this.playerPosition.x,
+      this.playerPosition.y,
+      cam.scrollX,
+      cam.scrollY,
+      cam.width,
+      cam.height,
+    );
+    if (!nearest) {
+      this.fireTimer = 0;
+      return;
+    }
+
     this.fireTimer += dt;
-    const nearest = findNearestEnemy(this.enemies, this.playerPosition.x, this.playerPosition.y);
     while (nearest && this.fireTimer >= this.fireCooldown) {
       this.fireTimer -= this.fireCooldown;
       this.bullets.push(
@@ -419,8 +495,16 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
   }
 
   private updateBullets(dt: number): void {
-    this.bullets = updateBullets(this.bullets, this.enemies, dt, (x, y) =>
-      this.spawnHitFlash(x, y),
+    const cam = this.cameras.main;
+    this.bullets = updateBullets(
+      this.bullets,
+      this.enemies,
+      dt,
+      (x, y) => this.spawnHitFlash(x, y),
+      cam.scrollX,
+      cam.scrollY,
+      cam.width,
+      cam.height,
     );
     this.cleanupDeadEnemies();
   }
@@ -508,7 +592,15 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
   private cleanupDeadEnemies(): void {
     this.enemies = cleanupDeadEnemies(this.enemies, (enemy) => {
       this.enemiesKilled += 1;
-      this.xpGems.push(spawnXpGem(this, enemy.x, enemy.y, enemy.xpValue));
+      this.xpGems = spawnXpGem(
+        this,
+        this.xpGems,
+        this.playerPosition.x,
+        this.playerPosition.y,
+        enemy.x,
+        enemy.y,
+        enemy.xpValue,
+      );
       this.spawnDeathBurst(enemy.x, enemy.y, enemy.isBoss);
     });
   }
@@ -560,11 +652,26 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
     const minutes = Math.floor(this.remaining / 60);
     const seconds = Math.floor(this.remaining % 60);
     this.hud.timer.setText(`${minutes}:${seconds.toString().padStart(2, "0")}`);
-    this.hud.level.setText(`LVL ${this.playerLevel}`);
-    this.hud.xp.setText(`XP ${Math.floor(this.playerXp)} / ${this.xpToNext}`);
-    this.hud.kills.setText(`KILLS ${this.enemiesKilled}`);
-    this.hud.hp.setText(`HP ${Math.ceil(this.playerHp)} / ${Math.ceil(this.playerMaxHp)}`);
-    this.hud.status.setText(buildStatusText(this));
+    this.hud.level.setText(`LEVEL: ${this.playerLevel}`);
+    this.hud.kills.setText(`Targets Eliminated: ${this.enemiesKilled}`);
+
+    const xpRatio = this.xpToNext > 0 ? Phaser.Math.Clamp(this.playerXp / this.xpToNext, 0, 1) : 0;
+    const xpFillHeight = 108 * xpRatio;
+    this.hud.xpBarFill.setSize(8, Math.max(0, xpFillHeight));
+    this.hud.xpBarFill.setPosition(35, 160);
+
+    const healthRatio =
+      this.playerMaxHp > 0 ? Phaser.Math.Clamp(this.playerHp / this.playerMaxHp, 0, 1) : 0;
+    this.hud.healthBarFill.setScale(healthRatio, 1);
+    this.hud.healthBarFill.setAlpha(healthRatio > 0 ? 0.95 : 0.25);
+
+    const shieldUnlocked = this.shieldLevel >= 0 && this.shieldMax > 0;
+    const shieldRatio =
+      shieldUnlocked ? Phaser.Math.Clamp(this.shieldHp / this.shieldMax, 0, 1) : 1;
+    this.hud.shieldBarBack.setFillStyle(0x10233d, shieldUnlocked ? 0.45 : 0.14);
+    this.hud.shieldBarBack.setStrokeStyle(1, 0x86bdff, shieldUnlocked ? 0.65 : 0.22);
+    this.hud.shieldBarFill.setScale(shieldRatio, 1);
+    this.hud.shieldBarFill.setFillStyle(0x7fc1ff, shieldUnlocked ? 0.95 : 0.16);
   }
 
   private formatElapsed(): string {

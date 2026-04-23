@@ -52,5 +52,5 @@ export type XpGemModel = {
   x: number;
   y: number;
   value: number;
-  lifetime: number;
+  kind: "normal" | "overflow";
 };
