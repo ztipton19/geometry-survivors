@@ -28,6 +28,7 @@ import {
   showEndOverlay,
   showLevelUpOverlay,
   showMenuOverlay,
+  showPauseOverlay,
 } from "../ui/gameUi";
 import { distanceToSegmentSquared } from "../utils/geometry";
 import type {
@@ -61,13 +62,13 @@ import {
 } from "../systems/progression";
 import { spawnXpGem, updateXpGems } from "../systems/xp";
 
-type GameMode = "menu" | "play" | "levelup" | "win" | "lose";
+type GameMode = "menu" | "play" | "paused" | "levelup" | "win" | "lose";
 
 export class GameScene extends Phaser.Scene implements UpgradeRuntime {
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private wasd!: Record<"W" | "A" | "S" | "D", Phaser.Input.Keyboard.Key>;
   private actionKeys!: Record<
-    "ENTER" | "SPACE" | "R" | "ONE" | "TWO" | "THREE",
+    "ENTER" | "SPACE" | "R" | "ONE" | "TWO" | "THREE" | "ESC",
     Phaser.Input.Keyboard.Key
   >;
 
@@ -163,8 +164,8 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
       Phaser.Input.Keyboard.Key
     >;
     this.actionKeys = this.input.keyboard!.addKeys(
-      "ENTER,SPACE,R,ONE,TWO,THREE",
-    ) as Record<"ENTER" | "SPACE" | "R" | "ONE" | "TWO" | "THREE", Phaser.Input.Keyboard.Key>;
+      "ENTER,SPACE,R,ONE,TWO,THREE,ESC",
+    ) as Record<"ENTER" | "SPACE" | "R" | "ONE" | "TWO" | "THREE" | "ESC", Phaser.Input.Keyboard.Key>;
 
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       if (this.mode !== "levelup") {
@@ -218,6 +219,20 @@ export class GameScene extends Phaser.Scene implements UpgradeRuntime {
   }
 
   private handleModeInput(): void {
+    if (Phaser.Input.Keyboard.JustDown(this.actionKeys.ESC)) {
+      if (this.mode === "play") {
+        this.mode = "paused";
+        showPauseOverlay(this.overlay);
+        return;
+      }
+
+      if (this.mode === "paused") {
+        this.mode = "play";
+        this.overlay.container.setVisible(false);
+        return;
+      }
+    }
+
     if (
       (Phaser.Input.Keyboard.JustDown(this.actionKeys.ENTER) ||
         Phaser.Input.Keyboard.JustDown(this.actionKeys.SPACE)) &&

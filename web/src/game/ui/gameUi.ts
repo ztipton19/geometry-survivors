@@ -314,3 +314,14 @@ export function showEndOverlay(
     setCardVisible(card, false);
   }
 }
+
+export function showPauseOverlay(overlay: Overlay): void {
+  overlay.container.setVisible(true);
+  overlay.backdrop.setFillStyle(0x000000, 0.7);
+  overlay.title.setText("PAUSED").setColor("#ffff00").setVisible(true);
+  overlay.subtitle.setText("Press Esc to resume.").setVisible(true);
+  overlay.footer.setText("").setVisible(false);
+  for (const card of overlay.cards) {
+    setCardVisible(card, false);
+  }
+}
