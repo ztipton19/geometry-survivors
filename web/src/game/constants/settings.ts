@@ -18,7 +18,7 @@ export const PLAYER = {
   thrust: 540,
   reverseThrust: 320,
   turnSpeed: 2.8,
-  damping: 1,
+  damping: 0.992,
   maxSpeed: 320,
   maxHp: 100,
   fireCooldown: 0.4,
