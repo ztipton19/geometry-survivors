@@ -1,1 +1,0 @@
-"""Clone Protocol game package."""
